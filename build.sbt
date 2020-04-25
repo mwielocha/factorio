@@ -1,6 +1,6 @@
 // Generated with scalagen
 
-val scalatestVersion = "3.1.0"
+val scalatestVersion = "3.1.1"
 
 val buildSettings = Seq(
   scalaVersion := "2.13.1",
@@ -12,10 +12,8 @@ val buildSettings = Seq(
     "-deprecation",
     "-feature",
     "-Yrangepos",
-    "-Ywarn-unused-import",
     "-language:existentials",
     "-language:higherKinds",
-    "-Ypartial-unification",
     "-language:postfixOps",
   ),
   publishMavenStyle := true,
