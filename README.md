@@ -36,7 +36,8 @@ implicit val componentAssembler: Assembler[Component] =
   Assembler[Component](() => new Component)
 implicit val repositoryAssembler: Assembler[Repository] = 
   Assembler[Repository](() => new Repository)
-implicit def appAssembler(
+  
+implicit def superComponentAssembler(
   implicit
     componentAssembler: Assembler[Component],
     repositoryAssembler: Assembler[Repository]
