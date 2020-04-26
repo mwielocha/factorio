@@ -133,6 +133,26 @@ val defaultComponent = assemble[DefaultComponent]
 val interfaceComponent = assemble[InterfaceComponent]
 ```
 
+### Eager components and non-singletons
+```scala
+import io.mwielocha.factorio.auto._
+
+implicit val make: Assembly = Assembly()
+
+// this will auto-create a non-singleton assembler for Component
+implicit val replicatedAssembler: Assembler[Component] =
+  replicated[Component]
+  
+// this will auto-create an eager singleton assembler for SuperComponent
+implicit val replicatedAssembler: Assembler[SuperComponent] =
+  eagerSingleton[SuperComponent]
+  
+val componentA = make[Component]
+val componentB = make[Component]
+
+componentA shouldNot be(componentB)
+```
+
 # TODO
 
 - detect cycles (now it will just stack overflow)
