@@ -156,6 +156,6 @@ componentA shouldNot be(componentB)
 # TODO
 
 - detect cycles (now it will just stack overflow)
-- add option to create components from apply companion metods
+- add option to create components from apply companion methods
 - bind same interface with different implementations multiple times (`@Named` functionality but with tag type perhaps?)
 - Actors?
