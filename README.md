@@ -132,3 +132,10 @@ val superComponent = assemble[SuperComponent]
 val defaultComponent = assemble[DefaultComponent]
 val interfaceComponent = assemble[InterfaceComponent]
 ```
+
+# TODO
+
+- detect cycles (now it will just stack overflow)
+- add option to create components from apply companion metods
+- bind same interface with different implementations multiple times (@Named functionality but with tag type perhaps?)
+- Actors?
