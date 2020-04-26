@@ -73,7 +73,7 @@ val interface = assemble[Interface]
 import io.mwielocha.factorio.auto._
 
 // mandatory assembly in scope
-implicit val assemble: Assembly = Assembly(
+implicit val assemble: Assembly = Assembly()
 
 // we can mix both approached for example to create factory methods
 val defaultComponent = new DefaultComponent(
