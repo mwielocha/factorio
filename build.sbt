@@ -56,7 +56,7 @@ lazy val `factorio-macro` = (project in file("factorio-macro")).
     libraryDependencies ++= Seq(
       "org.scalatest" %% "scalatest" % scalatestVersion
     )
-  )).dependsOn(`factorio-core`)
+  )).dependsOn(`factorio-core` % "compile->compile;test->test")
 
 lazy val root = (project in file("."))
   .aggregate(`factorio-core`, `factorio-macro`)
