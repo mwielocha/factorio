@@ -1,5 +1,5 @@
 # factorio
-Compile time dependency injection framework for Scala
+Tiny compile time dependency injection framework for Scala
 
 # Basic assumptions
 - everything is lazy by default
