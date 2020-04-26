@@ -87,7 +87,7 @@ implicit val interfaceAssembler: Assembler[Interface] =
 val interface = assemble[Interface] // this will yield defaultComponent
 ```
 
-### Smelting syntax to simplify inteface binding
+### Smelting syntax to simplify interface binding
 
 ```scala
 implicit val assemble: Assembly = Assembly()
