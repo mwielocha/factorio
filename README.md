@@ -8,6 +8,20 @@ Compile time dependency injection framework for Scala
 
 # Examples
 
+### Given an app of following components
+```scala
+class Component
+
+class Repository
+
+class SuperComponent(val component: Component, val repository: Repository)
+
+trait Interface
+
+class DefaultComponent(component: Component, repository: Repository)
+  extends SuperComponent(component, repository) with Interface
+```
+
 ### The boring part (manual assemblers)
 
 ```scala
@@ -43,6 +57,14 @@ implicit val assemble: Assembly = Assembly()
 
 // magic
 val component = assemble[SuperComponent]
+val interface = assemble[Interface]
+```
+### Compile time checking for missing bindings:
+```
+[info] Compiling 2 Scala sources to /Users/mwielocha/workspace/factorio/factorio-macro/target/scala-2.13/test-classes ...
+[error] /Users/mwielocha/workspace/factorio/factorio-macro/src/test/scala/io/mwielocha/factorio/auto/AutoAssemblySpec.scala:49:25: Cannot construct an instance of [io.mwielocha.factorio.Interface], create custom assembler or provide a public constructor.
+[error]     val interface = make[Interface]
+[error]
 ```
 
 ### Custom assemblers with auto assembly
@@ -62,3 +84,50 @@ implicit val interfaceAssembler: Assembler[Interface] =
   Assembler(() => defaultComponent)
   
 val interface = assemble[Interface] // this will yield defaultComponent
+```
+
+### Smelting syntax to simplify inteface binding
+
+```scala
+implicit val assemble: Assembly = Assembly()
+
+implicit val interfaceAssembler: Assembler[Interface] =
+  smelt[Interface].`with`[DefaultComponent]
+
+implicit val componentAssembler: Assembler[SuperComponent] =
+  smelt[SuperComponent].`with`[DefaultComponent]
+  
+val interface = asseble[Interface]
+val superComponent = asseble[SuperComponent]
+val defaultComponent = asseble[DefaultComponent]
+
+superComponent shouldBe interface
+defaultComponent shouldBe interface
+```
+
+### Group assemblers into recipes
+
+```scala
+trait ComponentRecipe {
+  requires: Recipe =>
+
+  implicit val interfaceAssembler: Assembler[Interface] =
+    smelt[Interface].`with`[DefaultComponent]
+
+  implicit val componentAssembler: Assembler[SuperComponent] =
+    smelt[SuperComponent].`with`[DefaultComponent]
+
+}
+```
+```scala
+
+implicit val assemble: Assembly = Assembly()
+
+val recipes = new Recipes with ComponentRecipe
+import recipes._
+
+val interface = assemble[Interface]
+val superComponent = assemble[SuperComponent]
+val defaultComponent = assemble[DefaultComponent]
+val interfaceComponent = assemble[InterfaceComponent]
+```
