@@ -98,9 +98,9 @@ implicit val interfaceAssembler: Assembler[Interface] =
 implicit val componentAssembler: Assembler[SuperComponent] =
   smelt[SuperComponent].`with`[DefaultComponent]
   
-val interface = asseble[Interface]
-val superComponent = asseble[SuperComponent]
-val defaultComponent = asseble[DefaultComponent]
+val interface = assemble[Interface]
+val superComponent = assemble[SuperComponent]
+val defaultComponent = assemble[DefaultComponent]
 
 superComponent shouldBe interface
 defaultComponent shouldBe interface
