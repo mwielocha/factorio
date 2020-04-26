@@ -1,6 +1,6 @@
 package io.mwielocha.factorio.auto
 
-import io.mwielocha.factorio._
+import io.mwielocha.factorio.{DefaultComponent, _}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -16,6 +16,27 @@ class AutoAssemblySpec extends AnyFlatSpec with Matchers {
 
     app.superComponent.component shouldBe component
     app.superComponent.repository shouldBe repository
+  }
+
+  it should "assemble an app with auto and custom assemblers" in {
+
+    implicit val make: Assembly = Assembly()
+
+    implicit val interfaceAssembler: Assembler[Interface] =
+      Assembler(() => new DefaultComponent(
+        implicitly[Assembler[Component]].assemble,
+        implicitly[Assembler[Repository]].assemble
+      ))
+
+    val app = make[TestApp]
+    val component = make[Component]
+    val repository = make[Repository]
+    val interface = make[Interface]
+    val defaultComponent = make[DefaultComponent]
+
+    app.superComponent.component shouldBe component
+    app.superComponent.repository shouldBe repository
+    defaultComponent shouldNot be(interface)
   }
 
   it should "assemble an app with auto assemblers from recipe" in {

@@ -1,6 +1,6 @@
 package io.mwielocha.factorio.auto
 
-import io.mwielocha.factorio.{Assembler, DefaultComponent, Interface, SuperComponent, Recipe}
+import io.mwielocha.factorio._
 
 trait ComponentRecipe {
   requires: Recipe =>

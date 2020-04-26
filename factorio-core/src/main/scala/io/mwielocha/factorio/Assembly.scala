@@ -10,11 +10,10 @@ class Assembly {
   private[factorio] def getOrRegister[T : ClassTag](assembler: () => Assembler[T]): Assembler[T] =
     synchronized {
       val runtimeClass = implicitly[ClassTag[T]].runtimeClass
-      val that: Assembler[T] = forge
+      val that = forge
         .getOrElse(runtimeClass, assembler())
-        .asInstanceOf[Assembler[T]]
       forge.update(runtimeClass, that)
-      that
+      that.asInstanceOf[Assembler[T]]
     }
 
   def apply[T: Assembler]: T = assemble
