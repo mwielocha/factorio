@@ -114,7 +114,6 @@ class AutoAssemblySpec extends AnyFlatSpec with Matchers {
 
   it should "not compile when a dependency is missing" in {
     implicit val make: Assembly = Assembly()
-    make[Interface]
     assertDoesNotCompile("make[Interface]")
   }
 }
