@@ -45,6 +45,7 @@ lazy val `factorio-core` = (project in file("factorio-core")).
   settings(buildSettings ++ Seq(
     name := "factorio-core",
     libraryDependencies ++= Seq(
+      "javax.inject" % "javax.inject" % "1",
       "com.chuusai" %% "shapeless" % "2.3.3",
       "org.scalatest" %% "scalatest" % scalatestVersion % Test,
     )

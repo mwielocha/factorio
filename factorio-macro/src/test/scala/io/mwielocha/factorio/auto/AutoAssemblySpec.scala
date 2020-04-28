@@ -105,4 +105,16 @@ class AutoAssemblySpec extends AnyFlatSpec with Matchers {
 
     componentA shouldNot be(componentB)
   }
+
+  it should "not compile when there is a circular dependency between components" in {
+    implicit val make: Assembly = Assembly()
+    assertDoesNotCompile("make[CircularComponent]")
+    assertDoesNotCompile("make[OtherCircularComponent]")
+  }
+
+  it should "not compile when a dependency is missing" in {
+    implicit val make: Assembly = Assembly()
+    make[Interface]
+    assertDoesNotCompile("make[Interface]")
+  }
 }

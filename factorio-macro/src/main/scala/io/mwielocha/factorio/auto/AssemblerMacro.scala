@@ -1,31 +1,39 @@
 package io.mwielocha.factorio.auto
 
+import io.mwielocha.factorio.auto.internal.MacroToolbox
+
 import scala.reflect.macros.blackbox
 
-object AssemblerMacro {
+object AssemblerMacro extends MacroToolbox {
+
+
 
   private def constructTree[T: c.WeakTypeTag](c: blackbox.Context): (c.Type, c.Tree) = {
     import c.universe._
 
-    lazy val targetType: Type = implicitly[c.WeakTypeTag[T]].tpe
-    lazy val realTargetType: Type = targetType.dealias
+    lazy val targetType: Type = weakTypeTag[T].tpe.dealias
 
-    lazy val constructors = realTargetType.members
-      .filter(m => m.isMethod && m.asMethod.isConstructor && m.isPublic)
-      .filterNot(_.asMethod.fullName.endsWith("$init$"))
+    val constructor = discoverConstructor(c)(targetType).getOrElse {
+      c.abort(c.enclosingPosition,
+        Error(s"Cannot construct an instance of [${Console.YELLOW}$targetType${Console.RED}], " +
+          s"create custom assembler or provide a public constructor.")
+      )
+    }
 
-    val assemblies: List[List[Tree]] = constructors.find(_.asMethod.isPrimaryConstructor).map {
-      _.asMethod.paramLists.map {
-        _.map { param =>
-          q"""implicitly[Assembler[${param.typeSignature}]].assemble"""
-        }
-      }
-    } getOrElse c.abort(c.enclosingPosition,
-      s"Cannot construct an instance of [$realTargetType], " +
-        s"create custom assembler or provide a public constructor.")
+    val constructorParameters = constructor.asMethod.paramLists
 
-    val constructionMethodTree: Tree = Select(New(Ident(realTargetType.typeSymbol)), termNames.CONSTRUCTOR)
-    realTargetType -> assemblies.foldLeft(constructionMethodTree) {
+    checkForCircularDependencies(c)
+
+    val constructorAssemblies: List[List[Tree]] = constructorParameters.map {
+      _.map(param => q"""implicitly[Assembler[${param.typeSignature}]].assemble""")
+    }
+
+    val constructorAssembliesTree: Tree = Select(
+      New(Ident(targetType.typeSymbol)),
+      termNames.CONSTRUCTOR
+    )
+
+    targetType -> constructorAssemblies.foldLeft(constructorAssembliesTree) {
       (acc: Tree, args: List[Tree]) =>
         Apply(acc, args)
     }
