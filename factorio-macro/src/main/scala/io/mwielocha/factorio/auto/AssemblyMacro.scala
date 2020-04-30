@@ -18,13 +18,13 @@ object AssemblyMacro extends MacroToolbox {
     val prov = providerLookup(c)(rtpe)
 
     val assemblies = assemblyTrees(c)(tpe, rname, bind, prov)
-    val names = assemblies.map { case (_, tree) => tree}
+    val trees = assemblies.map { case (_, tree) => tree }
     val entry = assemblies.last._1
 
     val output =
       q"""() => {
           val $rname: $rtpe = $recipe
-         ..$names
+         ..$trees
          $entry
       }"""
 
