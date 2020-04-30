@@ -109,12 +109,20 @@ object AssemblyMacro extends MacroToolbox {
 
     if(alreadyVisited(btpe -> lab)) out else {
 
-      val const = prov.getOrElse(btpe -> lab, discoverConstructor(c)(btpe)
-        .getOrElse {
-          c.abort(c.enclosingPosition,
-            Error(s"Cannot construct an instance of [${Console.YELLOW}$btpe${Console.RED}]")
-          )
-      })
+      val const = lab match {
+        case lab @ Some(v) =>
+          prov.getOrElse(btpe -> lab, c.abort(c.enclosingPosition,
+            Error(s"Privider not found for an instance of [${Console.YELLOW}$btpe${Console.RED}] " +
+              s"labeled with [${Console.YELLOW}$v${Console.RED}]")
+          ))
+        case None =>
+          prov.getOrElse(btpe -> None, discoverConstructor(c)(btpe)
+            .getOrElse {
+              c.abort(c.enclosingPosition,
+                Error(s"Cannot construct an instance of [${Console.YELLOW}$btpe${Console.RED}]")
+              )
+            })
+      }
 
       val newOut = out :+ (tpe, label(c)(btpe, lab), const, lab)
 
