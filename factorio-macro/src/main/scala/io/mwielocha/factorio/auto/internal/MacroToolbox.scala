@@ -1,8 +1,10 @@
 package io.mwielocha.factorio.auto.internal
 
+import com.sun.tools.classfile.TypeAnnotation.TargetType
+
 import scala.reflect.macros.blackbox
 
-trait MacroToolbox {
+trait MacroToolbox extends Toolbox {
 
   private [auto] object Error {
     def apply(msg: String): String =
@@ -16,24 +18,24 @@ trait MacroToolbox {
     constructors.find(_.asMethod.isPrimaryConstructor)
   }
 
-  private [auto] def checkForCircularDependencies(c: blackbox.Context): Unit = {
+  private [auto] def name(c: blackbox.Context)(targetType: c.Type): c.TermName = label(c)(targetType, None)
 
-    val targetType = c.macroApplication.tpe.dealias
+  private [auto] def label(c: blackbox.Context)(targetType: c.Type, sufx: Option[String]): c.TermName = {
+    import c.universe._
+    val baseClassName = targetType.baseClasses.head.name.toString
+    val name = c.freshName((Seq(firstCharLowerCase(baseClassName)) ++ sufx).mkString("@"))
+    TermName(name)
+  }
 
-    val macroTypeArguments = for {
-      context <- c.openMacros
-      macroType = context.macroApplication.tpe.dealias
-      if(macroType.erasure == targetType.erasure)
-    } yield macroType.typeArgs.head
+  private [auto] def isAnnotated(c: blackbox.Context)(m: c.Symbol, a: c.Type): Boolean =
+    m.asMethod.annotations.exists(_.tree.tpe == a)
 
-    macroTypeArguments.drop(2).foldLeft(Seq.empty[AnyRef]) {
-      case (cycle, argument) if cycle contains argument =>
-        c.abort(
-          c.enclosingPosition,
-          Error(s"Circular dependency detected: ${(cycle :+ argument).mkString(" ~> ")}")
-        )
-      case (cycle, argument) => cycle :+ argument
-
-    }
+  private [auto] def extractLabel(c: blackbox.Context)(m: c.Symbol): Option[String] = {
+    import c.universe._
+    m.annotations
+      .filter(_.tree.tpe == typeOf[javax.inject.Named])
+      .flatMap(_.tree.children.tail.headOption)
+      .headOption.flatMap(_.children.lastOption)
+      .map(_.toString()).map(x => x.substring(1, x.length - 1))
   }
 }

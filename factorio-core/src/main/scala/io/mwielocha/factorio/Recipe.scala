@@ -1,7 +1,6 @@
 package io.mwielocha.factorio
 
 trait Recipe {
-
-  protected implicit def assembly: Assembly
-
+  def bind[T]: To[T] =
+    new To[T]
 }
