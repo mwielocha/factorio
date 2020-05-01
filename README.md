@@ -17,7 +17,7 @@ class Service(val repository: Repository)
 
 class App(service: Service)
 
-val assemble = assembler[App](EmptyRecipe)
+val assembler = assemble[App](EmptyRecipe)
 
 val app = assemble()
 
@@ -47,7 +47,7 @@ class AppRecipe extends Recipe {
   }
 }
 
-val assemble = assembler[App](new AppRecipe)
+val assembler = assemble[App](new AppRecipe)
 
 val app = assemble()
 
@@ -72,7 +72,7 @@ class AppRecipe extends Recipe {
 
 }
 
-val assemble = assembler[App](new AppRecipe)
+val assembler = assemble[App](new AppRecipe)
 
 val app = assemble()
 
@@ -107,7 +107,7 @@ You can also provide multiple implementations with the `@named` discriminator:
 
  }
  
- val assemble = assembler[App](new AppRecipe)
+ val assembler = assemble[App](new AppRecipe)
  
  val app = assemble()
  
@@ -132,7 +132,7 @@ class Service(val repository: Repository)
 
 class App(service: Service)
 
-val assemble = assembler[App](EmptyRecipe)
+val assembler = assemble[App](EmptyRecipe)
 
 val app = assemble()
 
@@ -159,7 +159,7 @@ class AppRecipe extends Recipe {
 
 }
 
-val assemble = assembler[App](new AppRecipe)
+val assembler = assemble[App](new AppRecipe)
 
 val app = assemble()
 
@@ -178,7 +178,7 @@ class CircularDependency(val dependency: OuterCircularDependency)
 
 class OuterCircularDependency(val dependency: CircularDependency)
 
-val assemble = assembler[CircularDependency](EmptyRecipe)
+val assembler = assemble[CircularDependency](EmptyRecipe)
 
 //[error] [Factorio]: Circular dependency detected: factorio.CircularDependency -> factorio.OuterCircularDependency -> factorio.CircularDependency
 //[error]
