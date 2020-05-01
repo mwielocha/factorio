@@ -80,7 +80,7 @@ val app = assemble()
 // new App(new ServiceImpl(new Repository)))
 
 ```
-You can also provide multiple implementations with the `@Named` discriminator
+You can also provide multiple implementations with the `@Named` discriminator:
  ```scala
  
  import factorio._
@@ -112,9 +112,10 @@ You can also provide multiple implementations with the `@Named` discriminator
  val app = assemble()
  
  // val recipe = new AppRecipe
+ // val repository = new Repository
  // new App(
- //   recipe.thatService(new Repository), 
- //   recipe.otherService(new Repository))
+ //   recipe.thatService(repository), 
+ //   recipe.otherService(repository))
  // )
  
  ```
