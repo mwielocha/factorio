@@ -20,25 +20,25 @@ trait Toolbox[C <: blackbox.Context] {
     constructors.find(_.asMethod.isPrimaryConstructor)
   }
 
-  private[`macro`] def createUniqueName(targetType: Type, sufx: Option[String] = None): TermName = {
+  private[`macro`] def uname(targetType: Type, name: Option[String] = None): TermName = {
     import c.universe._
     val baseClassName = targetType.baseClasses.head.name.toString
-    val name = c.freshName((Seq(firstCharLowerCase(baseClassName)) ++ sufx).mkString("@"))
-    TermName(name)
+    val output = c.freshName((Seq(firstCharLowerCase(baseClassName)) ++ name).mkString("@"))
+    TermName(output)
   }
 
   private[`macro`] implicit class SymbolExtension(s: Symbol) {
 
     def isAnnotatedWith(a: Type): Boolean =
-      s.asMethod.annotations.exists(_.tree.tpe == a)
-  }
+      s.annotations.exists(_.tree.tpe == a)
 
-  private[`macro`] def extractLabel(m: Symbol): Option[String] = {
-    m.annotations
-      .filter(_.tree.tpe == typeOf[javax.inject.Named])
-      .flatMap(_.tree.children.tail.headOption)
-      .headOption.flatMap(_.children.lastOption)
-      .map(_.toString()).map(x => x.substring(1, x.length - 1))
+    def named: Option[String] = {
+      s.annotations
+        .filter(_.tree.tpe == typeOf[javax.inject.Named])
+        .flatMap(_.tree.children.tail.headOption)
+        .headOption.flatMap(_.children.lastOption)
+        .map(_.toString()).map(x => x.substring(1, x.length - 1))
+    }
   }
 
   private[`macro`] def firstCharLowerCase(s: String): String =

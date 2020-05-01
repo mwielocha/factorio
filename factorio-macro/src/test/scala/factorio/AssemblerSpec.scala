@@ -5,7 +5,7 @@ import org.scalatest.matchers.should.Matchers
 
 class AssemblerSpec extends AnyFlatSpec with Matchers {
 
-  trait CommonRecipe {
+  trait ServiceRecipe {
     requires: Recipe =>
 
     val serviceBinder = bind[Service].to[ServiceImpl]
@@ -23,7 +23,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   it should "assemble a simple app" in {
 
-    val assembler = assemble[App](new Recipe with CommonRecipe)
+    val assembler = assemble[App](new Recipe with ServiceRecipe)
 
     val app = assembler()
     app.service.repository shouldBe app.otherService.repository
@@ -33,7 +33,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     val database = new Database
 
-    class AppRecipe extends Recipe with CommonRecipe {
+    class AppRecipe extends Recipe with ServiceRecipe {
       @Provides
       def getDatabase: Database =
         database
@@ -53,7 +53,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     val repository = new Repository(database)
     val service = new ServiceImpl(repository)
 
-    class AppRecipe extends Recipe with CommonRecipe {
+    class AppRecipe extends Recipe with ServiceRecipe {
       @Provides
       def createApp(otherService: OtherService): App =
         new App(service, otherService)
@@ -67,7 +67,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     app.otherService.repository should not be (repository)
   }
 
-  it should "assemble an app from a recipe with labels" in {
+  it should "assemble an app from a recipe with named components" in {
 
     val database = new Database
     val otherDatabase = new Database
@@ -91,6 +91,38 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     repository.database shouldBe database
     repository.otherDatabase shouldBe otherDatabase
+  }
+
+  it should "assemble an app from a recipe with replicated components" in {
+
+    class ReplicatedServiceRecipe extends Recipe with ServiceRecipe {
+      val bindRepository = bind[Repository].to[ReplicatedRepository]
+    }
+
+    val assembler = assemble[App](new ReplicatedServiceRecipe)
+
+    val app = assembler()
+
+    app.service.repository shouldNot be(app.otherService.repository)
+    app.service.repository.database shouldBe app.otherService.repository.database
+  }
+
+  it should "assemble an app from a recipe with replicated, provided component" in {
+
+    class ReplicatedRepositoryRecipe extends Recipe with ServiceRecipe {
+
+      @Provides
+      @Replicated
+      def newRepository(database: Database) =
+        new Repository(database)
+    }
+
+    val assembler = assemble[App](new ReplicatedRepositoryRecipe)
+
+    val app = assembler()
+
+    app.service.repository shouldNot be(app.otherService.repository)
+    app.service.repository.database shouldBe app.otherService.repository.database
   }
 
   it should "not compile when circular dependency exists" in {

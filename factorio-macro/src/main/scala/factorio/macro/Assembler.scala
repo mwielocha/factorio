@@ -1,6 +1,6 @@
 package factorio.`macro`
 
-import factorio.{ Binder, Provides }
+import factorio.{ Binder, Provides, Replicated }
 
 import scala.reflect.macros.blackbox
 
@@ -8,31 +8,44 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
 
   import c.universe._
 
-  private case class Assem(tname: TermName, tree: Tree)
   private case class Named(tpe: Type, name: Option[String])
-  private case class Const(tpe: Type, tname: TermName, const: Symbol, name: Option[String])
+  private case class Assem(tname: TermName, tree: Tree, root: Boolean = false)
+  private case class Const(tpe: Type, tname: TermName, const: Symbol, props: Props)
+  private case class Props(name: Option[String] = None, replicated: Boolean = false, root: Boolean = false)
 
-  private type Binds = Map[Named, Type]
-  private type Provs = Map[Named, Symbol]
+  private case class Binder(tpe: Type, props: Props)
+  private case class Provider(sym: Symbol, props: Props)
 
-  def apply(recipe: c.Expr[R]): Tree = {
+  private type Binders = Map[Named, Binder]
+  private type Providers = Map[Named, Provider]
 
-    val tpe = weakTypeTag[T].tpe.dealias
-    val rtpe = weakTypeTag[R].tpe.dealias
-    val rname = createUniqueName(rtpe)
+  def assemble(recipe: c.Expr[R]): Tree = {
 
-    val bind = binderLookup(rtpe)
-    val prov = providerLookup(rtpe)
+    val targetType = weakTypeTag[T].tpe.dealias
+    val recipeTargetType = weakTypeTag[R].tpe.dealias
+    val recipeTermName = uname(recipeTargetType)
 
-    val assemblies = assemblyTrees(tpe, rname, bind, prov)
+    val binders = binderLookup(recipeTargetType)
+    val providers = providerLookup(recipeTargetType)
+
+    val assemblies = assemblyTrees(targetType, recipeTermName, binders, providers)
     val trees = assemblies.map(_.tree)
-    val entry = assemblies.last.tname
+
+    val root = assemblies
+      .find(_.root)
+      .map(_.tname)
+      .getOrElse {
+        c.abort(
+          c.enclosingPosition,
+          Error("Couldn't find application root.")
+        )
+      }
 
     val output =
       q"""() => {
-          val $rname: $rtpe = $recipe
+          val $recipeTermName: $recipeTargetType = $recipe
          ..$trees
-         $entry
+         $root
       }"""
 
     println(output)
@@ -42,8 +55,8 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
   private def assemblyTrees(
     targetType: Type,
     rname: TermName,
-    bind: Binds,
-    prov: Provs
+    bind: Binders,
+    prov: Providers
   ): Seq[Assem] = {
     import c.universe._
 
@@ -51,22 +64,22 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
 
     val graph = constructDependencyGraph(bind, prov)(
       targetType,
-      None,
+      Props(root = true),
       Seq.empty,
       Seq.empty
     ).reverse
 
     graph.foldLeft(trees) {
-      case (trees, Const(tpe, fname, const, lab)) =>
+      case (trees, Const(targetType, fname, const, props)) =>
         trees :+ {
           val args = const.asMethod.paramLists.map {
             _.flatMap { param =>
               val ptpe = param.typeSignature.dealias
-              val plab = extractLabel(param)
+              val plab = param.named
 
               graph.find {
-                case Const(tpe, _, _, lab) =>
-                  tpe == ptpe && plab == lab
+                case Const(targetType, _, _, props) =>
+                  targetType == ptpe && plab == props.name
               } match {
                 case Some(Const(_, name, _, _)) =>
                   Some(q"""$name""")
@@ -75,116 +88,146 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
             }
           }
 
-          val isConst = const.asMethod.isConstructor
+          val named = Named(targetType, props.name)
 
-          val btpe = bind.getOrElse(Named(tpe, lab), tpe)
+          val isConstructor = const.asMethod.isConstructor
+
+          val Binder(typeOrBindedType, propsOrBindedProps) =
+            bind.getOrElse(named, Binder(targetType, props))
 
           val constTree =
-            if (isConst) q"""new $btpe(...$args)"""
+            if (isConstructor) q"""new $typeOrBindedType(...$args)"""
             else q"""$rname.$const(...$args)"""
 
-          Assem(fname, q"""lazy val $fname: $tpe = $constTree""")
+          val replicated = props.replicated || propsOrBindedProps.replicated ||
+            prov.view.mapValues(_.props.replicated).getOrElse(named, false)
+
+          Assem(
+            fname,
+            if (replicated) {
+              q"""def $fname: $targetType = $constTree"""
+            } else q"""lazy val $fname: $targetType = $constTree""",
+            propsOrBindedProps.root
+          )
         }
     }
   }
 
   private def constructDependencyGraph(
-    bind: Binds = Map.empty,
-    prov: Provs = Map.empty
+    binders: Binders = Map.empty,
+    providers: Providers = Map.empty
   )(
-    tpe: Type, // type
-    lab: Option[String],
-    pth: Seq[Type] = Seq.empty, //path from root
-    out: Seq[Const] = Seq.empty // output
+    targetType: Type, // type
+    props: Props,
+    path: Seq[Type] = Seq.empty, //path from root
+    output: Seq[Const] = Seq.empty // output
   ): Seq[Const] = {
 
-    val btpe = bind.getOrElse(Named(tpe, lab), tpe)
+    val Binder(typeOrBindedType, propsOrBindedProps) =
+      binders.getOrElse(Named(targetType, props.name), Binder(targetType, props))
 
-    if (pth.contains(btpe))
-      c.abort(c.enclosingPosition, Error(s"Circular dependency detected: ${(pth :+ btpe).mkString(" -> ")}"))
+    val propsWithReplicated = propsOrBindedProps.copy(
+      replicated = props.replicated || typeOrBindedType.typeSymbol
+        .isAnnotatedWith(typeOf[Replicated])
+    )
 
-    val alreadyVisited = out.view
+    if (path.contains(typeOrBindedType))
+      c.abort(c.enclosingPosition, Error(s"Circular dependency detected: ${(path :+ typeOrBindedType).mkString(" -> ")}"))
+
+    val alreadyVisited = output.view
       .map {
-        case Const(vtpe, _, _, vlab) =>
-          vtpe -> vlab
+        case Const(visitedType, _, _, Props(name, _, _)) =>
+          visitedType -> name
       }.to(Set)
 
-    if (alreadyVisited(btpe -> lab)) out
+    if (alreadyVisited(typeOrBindedType -> propsWithReplicated.name)) output
     else {
 
-      val const = lab match {
+      val const = propsWithReplicated.name match {
 
-        case lab @ Some(v) =>
-          prov.getOrElse(
-            Named(btpe, lab),
-            c.abort(
-              c.enclosingPosition,
-              Error(
-                s"Proivider not found for an instance of [${Console.YELLOW}$btpe${Console.RED}] " +
-                  s"labeled with [${Console.YELLOW}$v${Console.RED}]"
+        case nameOrNone @ Some(name) =>
+          providers.view
+            .mapValues(_.sym).getOrElse(
+              Named(typeOrBindedType, nameOrNone),
+              c.abort(
+                c.enclosingPosition,
+                Error(
+                  s"Proivider not found for an instance of [${Console.YELLOW}$typeOrBindedType${Console.RED}] " +
+                    s"labeled with [${Console.YELLOW}$name${Console.RED}]"
+                )
               )
             )
-          )
 
         case None =>
-          prov.getOrElse(
-            Named(btpe, lab),
-            discoverConstructor(btpe)
-              .getOrElse {
-                c.abort(c.enclosingPosition, Error(s"Cannot construct an instance of [${Console.YELLOW}$btpe${Console.RED}]"))
-              }
-          )
+          providers.view
+            .mapValues(_.sym).getOrElse(
+              Named(typeOrBindedType, propsWithReplicated.name),
+              discoverConstructor(typeOrBindedType)
+                .getOrElse {
+                  c.abort(c.enclosingPosition, Error(s"Cannot construct an instance of [${Console.YELLOW}$typeOrBindedType${Console.RED}]"))
+                }
+            )
       }
 
-      val newOut = out :+ Const(tpe, createUniqueName(btpe, lab), const, lab)
+      val targetTermName = uname(typeOrBindedType, propsWithReplicated.name)
+      val newOut = output :+ Const(targetType, targetTermName, const, propsWithReplicated)
 
       const.asMethod.paramLists.foldLeft(newOut) {
         case (out, list) =>
           list.foldLeft(out) {
-            case (out, p) =>
-              val ptpe = p.typeSignature.dealias
-              val lab = extractLabel(p)
-              constructDependencyGraph(bind, prov)(ptpe, lab, pth :+ btpe, out)
+            case (out, parameter) =>
+              val parameterType = parameter.typeSignature.dealias
+              val name = parameter.named
+              val props = Props(name)
+              constructDependencyGraph(binders, providers)(parameterType, props, path :+ typeOrBindedType, out)
           }
 
       }
     }
   }
 
-  private def providerLookup(rtpe: Type): Provs = {
+  private def providerLookup(rtpe: Type): Providers = {
 
-    val rprov = Map.empty[Named, Symbol]
+    val providers = Map.empty[Named, Provider]
 
-    rtpe.baseClasses.foldLeft(rprov) {
+    rtpe.baseClasses.foldLeft(providers) {
       case (acc, clazz) =>
         clazz.typeSignature.members.foldLeft(acc) {
           case (acc, m) =>
             if (m.isMethod && m.isPublic && m.isAnnotatedWith(typeOf[Provides])) {
-              val tpe = m.typeSignature.resultType.dealias
+              val targetType = m.typeSignature.resultType.dealias
 
-              acc + (Named(tpe, extractLabel(m)) -> m)
+              val name = m.named
+              val replicated = m.isAnnotatedWith(typeOf[Replicated])
+              val provider = Provider(m, Props(name, replicated))
+
+              acc + (Named(targetType, name) -> provider)
             } else acc
         }
     }
   }
 
-  private def binderLookup(rtpe: Type): Binds = {
+  private def binderLookup(rtpe: Type): Binders = {
     import c.universe._
 
-    val rbind = Map.empty[Named, Type]
+    val binders = Map.empty[Named, Binder]
 
     def isBinder(m: Symbol): Boolean =
-      m.typeSignature.resultType.erasure == typeOf[Binder[_, _]].erasure
+      m.typeSignature.resultType.erasure == typeOf[factorio.Binder[_, _]].erasure
 
-    rtpe.baseClasses.foldLeft(rbind) {
+    rtpe.baseClasses.foldLeft(binders) {
       case (acc, clazz) =>
         clazz.typeSignature.members.foldLeft(acc) {
           case (acc, m) =>
             if (m.isMethod && m.isTerm && isBinder(m)) {
-              val t :: k :: Nil = m.typeSignature.resultType.typeArgs
+              val targetType :: bindedType :: Nil = m.typeSignature.resultType.typeArgs
                 .map(_.dealias)
 
-              acc + (Named(t, extractLabel(m)) -> k)
+              val name = m.named
+              val replicated = m.isAnnotatedWith(typeOf[Replicated])
+              val binder = Binder(bindedType, Props(name, replicated))
+
+              acc + (Named(targetType, name) -> binder)
             } else acc
         }
     }

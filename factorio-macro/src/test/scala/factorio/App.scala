@@ -1,7 +1,5 @@
 package factorio
 
-import javax.inject.Named
-
 class Database
 
 class Repository(val database: Database)
@@ -11,6 +9,9 @@ trait Service {
 }
 
 class ServiceImpl(val repository: Repository) extends Service
+
+@Replicated
+class ReplicatedRepository(database: Database) extends Repository(database)
 
 trait OtherService {
   def repository: Repository
