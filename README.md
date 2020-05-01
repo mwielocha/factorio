@@ -148,7 +148,7 @@ class ServiceImpl(val repository: Repository) extends Service
 
 class App(service: Service)
 
-assembler[App](EmptyRecipe)
+assemble[App](EmptyRecipe)
 
 //[error] [Factorio]: Cannot construct an instance of [factorio.Service]
 //[error]
