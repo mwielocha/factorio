@@ -53,7 +53,17 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
          $root
       }"""
 
-    println(output)
+    val verbose = output
+      .toString().split("\n")
+      .mkString(Console.GREEN, s"\n${Console.GREEN}", Console.RESET)
+
+    c.info(
+      c.enclosingPosition,
+      s"\n[Factorio]:" +
+        s"\nGenerated output:\n${verbose}",
+      force = false
+    )
+
     output
   }
 
@@ -148,8 +158,6 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
       }.to(Set)
 
     if (!alreadyVisited(typeOrBindedType -> props.name)) {
-
-      println(s"$typeOrBindedType (${props.name}) - isBinded: " + isBinded)
 
       val const = props.name match {
 
