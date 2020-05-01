@@ -137,6 +137,25 @@ val assemble = assembler[CircularDependency](EmptyRecipe)
 //[error] one error found
 
 ```
+or if there is no constructor nor recipe for the given type:
+```scala
+
+import factorio._
+
+class Repository
+trait Service
+class ServiceImpl(val repository: Repository) extends Service
+
+class App(service: Service)
+
+assembler[App](EmptyRecipe)
+
+//[error] [Factorio]: Cannot construct an instance of [factorio.Service]
+//[error]
+//[error]     assemble[App](EmptyRecipe)
+//[error]                  ^
+//[error] one error found
+```
 
 
 

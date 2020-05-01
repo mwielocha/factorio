@@ -97,4 +97,9 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     //assemble[CircularDependency](EmptyRecipe)
     assertDoesNotCompile("assemble[CircularDependency](EmptyRecipe)")
   }
+
+  it should "not compile when no binding was provided for an interface" in {
+    //assemble[App](EmptyRecipe)
+    assertDoesNotCompile("assemble[App](EmptyRecipe)")
+  }
 }
