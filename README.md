@@ -2,160 +2,84 @@
 Tiny compile time dependency injection framework for Scala
 
 # Basic assumptions
-- everything is lazy by default
 - everything is a singleton by default
-- compile time checking for dependency graph completeness 
+- compile time checking for dependency graph correctness 
 
-# Examples
+# Usage
 
-### Given an app of following components
+### Basic constructor composition
 ```scala
-class Component
+
+import factorio._
 
 class Repository
+class Service(val repository: Repository)
 
-class SuperComponent(val component: Component, val repository: Repository)
+class App(service: Service)
 
-trait Interface
+val assemble = assembler[App](EmptyRecipe)
 
-class DefaultComponent(component: Component, repository: Repository)
-  extends SuperComponent(component, repository) with Interface
+val app = assemble()
+
+// new App(new Service(new Repository)))
+
 ```
 
-### The boring part (manual assemblers)
+### Recipies
+
+You can configure coupling with a recipe. Recipe is a class that extends `factorio.Recipe` and contains a set or rule on how to construct given components.
+There are two ways of provind coupling rules:
 
 ```scala
-import io.mwielocha.factorio._
 
-// we need an implicit assembly in scope
-implicit val assemble: Assembly = Assembly()
+import factorio._
 
-// now we can contruct assemblers by hand:
+class Repository
+class Service(val repository: Repository)
 
-implicit val componentAssembler: Assembler[Component] = 
-  Assembler[Component](() => new Component)
-implicit val repositoryAssembler: Assembler[Repository] = 
-  Assembler[Repository](() => new Repository)
+class App(service: Service)
+
+class AppRecipe extends Recipe {
   
-implicit def superComponentAssembler(
-  implicit
-    componentAssembler: Assembler[Component],
-    repositoryAssembler: Assembler[Repository]
-): Assembler[SuperComponent] = Assembler[SuperComponent](
-  () => new SuperComponent(componentAssembler.assemble, repositoryAssembler.assemble)
-)
+  @Provides
+  def createService(repository: Repository): Service = {
+    new Service(repository)
+  }
+}
 
-// the app is ready
-val component = assemble[SuperComponent]
+val assemble = assembler[App](new AppRecipe)
+
+val app = assemble()
+
+// val recipe = new AppRecipe
+// new App(recipe.createService(new Repository)))
+
 ```
-
-### The exciting part (auto assemblers)
+You can also simply `bind` implementations to super classes or interfaces:
 ```scala
-import io.mwielocha.factorio.auto._
 
-// mandatory assembly in scope
-implicit val assemble: Assembly = Assembly()
+import factorio._
 
-// magic
-val component = assemble[SuperComponent]
-val interface = assemble[Interface]
-```
-### Compile time checking for missing bindings
-```
-[info] Compiling 2 Scala sources to /Users/mwielocha/workspace/factorio/factorio-macro/target/scala-2.13/test-classes ...
-[error] /Users/mwielocha/workspace/factorio/factorio-macro/src/test/scala/io/mwielocha/factorio/auto/AutoAssemblySpec.scala:49:25: Cannot construct an instance of [io.mwielocha.factorio.Interface], create custom assembler or provide a public constructor.
-[error]     val interface = make[Interface]
-[error]
-```
+class Repository
+trait Service
+class ServiceImpl(val repository: Repository) extends Service
 
-### Custom assemblers with auto assembly
-```scala
-import io.mwielocha.factorio.auto._
+class App(service: Service)
 
-// mandatory assembly in scope
-implicit val assemble: Assembly = Assembly()
-
-// we can mix both approached for example to create factory methods
-val defaultComponent = new DefaultComponent(
-  implicitly[Assembler[Component]].assemble,
-  implicitly[Assembler[Repository]].assemble
-)
-
-implicit val interfaceAssembler: Assembler[Interface] =
-  Assembler(() => defaultComponent)
+class AppRecipe extends Recipe {
   
-val interface = assemble[Interface] // this will yield defaultComponent
-```
-
-### Smelting syntax to simplify interface binding
-
-```scala
-implicit val assemble: Assembly = Assembly()
-
-implicit val interfaceAssembler: Assembler[Interface] =
-  smelt[Interface].`with`[DefaultComponent]
-
-implicit val componentAssembler: Assembler[SuperComponent] =
-  smelt[SuperComponent].`with`[DefaultComponent]
-  
-val interface = assemble[Interface]
-val superComponent = assemble[SuperComponent]
-val defaultComponent = assemble[DefaultComponent]
-
-superComponent shouldBe interface
-defaultComponent shouldBe interface
-```
-
-### Group assemblers into recipes
-
-```scala
-trait ComponentRecipe {
-  requires: Recipe =>
-
-  implicit val interfaceAssembler: Assembler[Interface] =
-    smelt[Interface].`with`[DefaultComponent]
-
-  implicit val componentAssembler: Assembler[SuperComponent] =
-    smelt[SuperComponent].`with`[DefaultComponent]
+  val serviceBinder = bind[Service].to[ServiceImpl]
 
 }
-```
-```scala
 
-implicit val assemble: Assembly = Assembly()
+val assemble = assembler[App](new AppRecipe)
 
-val recipes = new Recipes with ComponentRecipe
-import recipes._
+val app = assemble()
 
-val interface = assemble[Interface]
-val superComponent = assemble[SuperComponent]
-val defaultComponent = assemble[DefaultComponent]
-val interfaceComponent = assemble[InterfaceComponent]
+// val recipe = new AppRecipe
+// new App(new ServiceImpl(new Repository)))
+
 ```
 
-### Eager components and non-singletons
-```scala
-import io.mwielocha.factorio.auto._
 
-implicit val make: Assembly = Assembly()
 
-// this will auto-create a non-singleton assembler for Component
-implicit val replicatedAssembler: Assembler[Component] =
-  replicated[Component]
-  
-// this will auto-create an eager singleton assembler for SuperComponent
-implicit val replicatedAssembler: Assembler[SuperComponent] =
-  eagerSingleton[SuperComponent]
-  
-val componentA = make[Component]
-val componentB = make[Component]
-
-componentA shouldNot be(componentB)
-```
-
-# TODO
-
-- detect cycles (now it will just stack overflow)
-- add option to create components from apply companion methods
-- bind same interface with different implementations multiple times (`@Named` functionality but with tag type perhaps?)
-- Actors?

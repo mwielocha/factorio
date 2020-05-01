@@ -16,6 +16,7 @@ val buildSettings = Seq(
     "-language:higherKinds",
     "-language:postfixOps",
   ),
+  scalafmtOnCompile in ThisBuild := true,
   publishMavenStyle := true,
   publishArtifact in Test := false,
   pomIncludeRepository := { _ => false },
@@ -59,7 +60,7 @@ lazy val `factorio-macro` = (project in file("factorio-macro")).
     )
   )).dependsOn(`factorio-core` % "compile->compile;test->test")
 
-lazy val root = (project in file("."))
+lazy val factorio = (project in file("."))
   .aggregate(`factorio-core`, `factorio-macro`)
 
 
