@@ -141,7 +141,7 @@ val app = assembler()
 // new App(new Service(repository)))
 
 ```
-Annotations can be composed in order to combine effects:
+Annotations can be composed with other annotations or binders in order to combine effects:
 ```scala
 
 import factorio._
