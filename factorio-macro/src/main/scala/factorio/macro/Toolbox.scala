@@ -20,18 +20,18 @@ trait Toolbox[C <: blackbox.Context] {
     constructors.find(_.asMethod.isPrimaryConstructor)
   }
 
-  private[`macro`] def createUniqueName(targetType: Type): TermName =
-    createUniqueLabel(targetType, None)
-
-  private[`macro`] def createUniqueLabel(targetType: Type, sufx: Option[String]): TermName = {
+  private[`macro`] def createUniqueName(targetType: Type, sufx: Option[String] = None): TermName = {
     import c.universe._
     val baseClassName = targetType.baseClasses.head.name.toString
     val name = c.freshName((Seq(firstCharLowerCase(baseClassName)) ++ sufx).mkString("@"))
     TermName(name)
   }
 
-  private[`macro`] def isAnnotated(m: Symbol, a: Type): Boolean =
-    m.asMethod.annotations.exists(_.tree.tpe == a)
+  private[`macro`] implicit class SymbolExtension(s: Symbol) {
+
+    def isAnnotatedWith(a: Type): Boolean =
+      s.asMethod.annotations.exists(_.tree.tpe == a)
+  }
 
   private[`macro`] def extractLabel(m: Symbol): Option[String] = {
     m.annotations

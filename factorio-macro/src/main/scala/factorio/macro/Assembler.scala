@@ -136,7 +136,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
           )
       }
 
-      val newOut = out :+ Const(tpe, createUniqueLabel(btpe, lab), const, lab)
+      val newOut = out :+ Const(tpe, createUniqueName(btpe, lab), const, lab)
 
       const.asMethod.paramLists.foldLeft(newOut) {
         case (out, list) =>
@@ -159,7 +159,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
       case (acc, clazz) =>
         clazz.typeSignature.members.foldLeft(acc) {
           case (acc, m) =>
-            if (m.isMethod && m.isPublic && isAnnotated(m, typeOf[Provides])) {
+            if (m.isMethod && m.isPublic && m.isAnnotatedWith(typeOf[Provides])) {
               val tpe = m.typeSignature.resultType.dealias
 
               acc + (Named(tpe, extractLabel(m)) -> m)
