@@ -1,6 +1,5 @@
 package factorio
 
-import javax.inject.Named
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
