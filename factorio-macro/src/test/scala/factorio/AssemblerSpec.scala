@@ -5,85 +5,96 @@ import org.scalatest.matchers.should.Matchers
 
 class AssemblerSpec extends AnyFlatSpec with Matchers {
 
-  "Assembly macro" should "assemble a simple app" in {
+  trait CommonRecipe {
+    requires: Recipe =>
 
-    val assembler = assemble[TestApp](EmptyRecipe)
+    val serviceBinder = bind[Service].to[ServiceImpl]
+    val otherServiceBinder = bind[OtherService].to[OtherServiceImpl]
+
+  }
+
+  "Assembly macro" should "assemble a component" in {
+
+    val assembler = assemble[Repository](EmptyRecipe)
+
+    assembler()
+    succeed
+  }
+
+  it should "assemble a simple app" in {
+
+    val assembler = assemble[App](new Recipe with CommonRecipe)
 
     val app = assembler()
-    app.superComponent.repository shouldBe app.repository
+    app.service.repository shouldBe app.otherService.repository
   }
 
   it should "assemble an app from a recipe with a simple @provides method" in {
 
-    val component = new Component
+    val database = new Database
 
-    class AppRecipe extends Recipe {
+    class AppRecipe extends Recipe with CommonRecipe {
       @Provides
-      def getComponent: Component =
-        component
+      def getDatabase: Database =
+        database
     }
 
-    val assembler = assemble[TestApp](new AppRecipe)
+    val assembler = assemble[App](new AppRecipe)
 
     val app = assembler()
 
-    app.superComponent.component shouldBe component
+    app.service.repository.database shouldBe database
+    app.otherService.repository.database shouldBe database
   }
 
   it should "assemble an app from a recipe with a complex @provides method" in {
 
-    val repository = new Repository
+    val database = new Database
+    val repository = new Repository(database)
+    val service = new ServiceImpl(repository)
 
-    class AppRecipe extends Recipe {
+    class AppRecipe extends Recipe with CommonRecipe {
       @Provides
-      def makeSuperComponent(component: Component): SuperComponent =
-        new SuperComponent(component, repository)
+      def createApp(otherService: OtherService): App =
+        new App(service, otherService)
     }
 
-    val assembler = assemble[TestApp](new AppRecipe)
+    val assembler = assemble[App](new AppRecipe)
 
     val app = assembler()
 
-    app.repository should not be (repository)
-    app.superComponent.repository shouldBe repository
-  }
-
-  it should "assemble an app from a recipe with binders" in {
-
-    class TestAppRecipe extends Recipe {
-      val bindSuperComponent = bind[SuperComponent].to[DefaultComponent]
-    }
-
-    val assembler = assemble[TestApp](new TestAppRecipe)
-
-    val app = assembler()
-
-    app.superComponent.getClass shouldBe classOf[DefaultComponent]
+    app.service shouldBe service
+    app.otherService.repository should not be (repository)
   }
 
   it should "assemble an app from a recipe with labels" in {
 
-    class LabeledAppRecipe extends Recipe {
+    val database = new Database
+    val otherDatabase = new Database
+
+    class MultiDatabaseRepositoryRecipe extends Recipe {
 
       @Provides
-      @Named("that")
-      def thatComponent =
-        new Component
+      @Named("database")
+      def getDatabase =
+        database
 
       @Provides
-      @Named("other")
-      def otherComponent =
-        new Component
+      @Named("otherDatabase")
+      def getOtherDatabase =
+        otherDatabase
     }
 
-    val assembler = assemble[LabeledApp](new LabeledAppRecipe)
+    val assembler = assemble[MultiDatabaseRepository](new MultiDatabaseRepositoryRecipe)
 
-    val app = assembler()
+    val repository = assembler()
 
-    app.that should not be (app.other)
+    repository.database shouldBe database
+    repository.otherDatabase shouldBe otherDatabase
   }
 
   it should "not compile when circular dependency exists" in {
-    assertDoesNotCompile("assemble[OtherCircularComponent]()")
+    //assemble[CircularDependency](EmptyRecipe)
+    assertDoesNotCompile("assemble[CircularDependency](EmptyRecipe)")
   }
 }

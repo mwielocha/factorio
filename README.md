@@ -119,6 +119,24 @@ You can also provide multiple implementations with the `@Named` discriminator:
  // )
  
  ```
+### Dependency graph corectness
+Factorio will validate the corectness of the dependency graph in compile time and will abort compilation on any given error:
+```scala
+import factorio._
+
+class CircularDependency(val dependency: OuterCircularDependency)
+
+class OuterCircularDependency(val dependency: CircularDependency)
+
+val assemble = assembler[CircularDependency](EmptyRecipe)
+
+//[error] [Factorio]: Circular dependency detected: factorio.CircularDependency -> factorio.OuterCircularDependency -> factorio.CircularDependency
+//[error]
+//[error]     assemble[CircularDependency](EmptyRecipe)
+//[error]                                 ^
+//[error] one error found
+
+```
 
 
 
