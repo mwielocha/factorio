@@ -1,6 +1,6 @@
-package io.mwielocha.factorio.auto.internal
+package factorio.internal
 
-import io.mwielocha.factorio.{ Binder, Provides }
+import factorio.{ Binder, Provides }
 
 import scala.reflect.macros.blackbox
 
@@ -39,7 +39,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     output
   }
 
-  private[auto] def assemblyTrees(
+  private def assemblyTrees(
     targetType: Type,
     rname: TermName,
     bind: Binds,
@@ -88,7 +88,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     }
   }
 
-  private[auto] def constructDependencyGraph(
+  private def constructDependencyGraph(
     bind: Binds = Map.empty,
     prov: Provs = Map.empty
   )(
@@ -151,7 +151,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     }
   }
 
-  private[auto] def providerLookup(rtpe: Type): Provs = {
+  private def providerLookup(rtpe: Type): Provs = {
 
     val rprov = Map.empty[Named, Symbol]
 
@@ -168,7 +168,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     }
   }
 
-  private[auto] def binderLookup(rtpe: Type): Binds = {
+  private def binderLookup(rtpe: Type): Binds = {
     import c.universe._
 
     val rbind = Map.empty[Named, Type]

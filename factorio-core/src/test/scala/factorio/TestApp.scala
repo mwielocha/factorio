@@ -1,8 +1,6 @@
-package io.mwielocha.factorio
+package factorio
 
 import javax.inject.Named
-
-import scala.concurrent.ExecutionContext
 
 class Component
 

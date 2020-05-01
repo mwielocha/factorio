@@ -1,4 +1,4 @@
-package io.mwielocha.factorio.auto.internal
+package factorio.internal
 
 trait Toolbox {
 

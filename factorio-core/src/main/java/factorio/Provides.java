@@ -1,4 +1,4 @@
-package io.mwielocha.factorio;
+package factorio;
 
 import javax.inject.Scope;
 import java.lang.annotation.Documented;

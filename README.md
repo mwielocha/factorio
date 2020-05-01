@@ -63,7 +63,7 @@ val interface = assemble[Interface]
 ### Compile time checking for missing bindings
 ```
 [info] Compiling 2 Scala sources to /Users/mwielocha/workspace/factorio/factorio-macro/target/scala-2.13/test-classes ...
-[error] /Users/mwielocha/workspace/factorio/factorio-macro/src/test/scala/io/mwielocha/factorio/auto/AutoAssemblySpec.scala:49:25: Cannot construct an instance of [io.mwielocha.factorio.Interface], create custom assembler or provide a public constructor.
+[error] /Users/mwielocha/workspace/factorio/factorio-macro/src/test/scala/io/mwielocha/factorio/auto/AutoAssemblySpec.scala:49:25: Cannot construct an instance of [factorio.Interface], create custom assembler or provide a public constructor.
 [error]     val interface = make[Interface]
 [error]
 ```

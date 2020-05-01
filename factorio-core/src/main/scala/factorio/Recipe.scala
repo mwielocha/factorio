@@ -1,4 +1,4 @@
-package io.mwielocha.factorio
+package factorio
 
 trait Recipe {
 

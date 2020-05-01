@@ -1,4 +1,4 @@
-package io.mwielocha.factorio.auto.internal
+package factorio.internal
 
 import scala.reflect.macros.blackbox
 
@@ -7,33 +7,33 @@ trait MacroToolbox[C <: blackbox.Context] extends Toolbox {
   val c: C
   import c.universe._
 
-  private[auto] object Error {
+  private[internal] object Error {
 
     def apply(msg: String): String =
       s"\n${Console.YELLOW}[Factorio]: ${Console.RED}$msg${Console.RESET}\n\n"
   }
 
-  private[auto] def discoverConstructor(targetType: Type): Option[Symbol] = {
+  private[internal] def discoverConstructor(targetType: Type): Option[Symbol] = {
     lazy val constructors = targetType.members
       .filter(m => m.isMethod && m.asMethod.isConstructor && m.isPublic)
       .filterNot(_.asMethod.fullName.endsWith("$init$"))
     constructors.find(_.asMethod.isPrimaryConstructor)
   }
 
-  private[auto] def createUniqueName(targetType: Type): TermName =
+  private[internal] def createUniqueName(targetType: Type): TermName =
     createUniqueLabel(targetType, None)
 
-  private[auto] def createUniqueLabel(targetType: Type, sufx: Option[String]): TermName = {
+  private[internal] def createUniqueLabel(targetType: Type, sufx: Option[String]): TermName = {
     import c.universe._
     val baseClassName = targetType.baseClasses.head.name.toString
     val name = c.freshName((Seq(firstCharLowerCase(baseClassName)) ++ sufx).mkString("@"))
     TermName(name)
   }
 
-  private[auto] def isAnnotated(m: Symbol, a: Type): Boolean =
+  private[internal] def isAnnotated(m: Symbol, a: Type): Boolean =
     m.asMethod.annotations.exists(_.tree.tpe == a)
 
-  private[auto] def extractLabel(m: Symbol): Option[String] = {
+  private[internal] def extractLabel(m: Symbol): Option[String] = {
     m.annotations
       .filter(_.tree.tpe == typeOf[javax.inject.Named])
       .flatMap(_.tree.children.tail.headOption)

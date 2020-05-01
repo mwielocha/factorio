@@ -1,11 +1,10 @@
-package io.mwielocha.factorio.auto
+package factorio
 
-import io.mwielocha.factorio._
 import javax.inject.Named
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-class AssemblyMacroSpec extends AnyFlatSpec with Matchers {
+class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   "Assembly macro" should "assemble a simple app" in {
 
