@@ -9,4 +9,6 @@ trait Syntax {
   object EmptyRecipe extends Recipe
 
   def assemble[T]: Assembler[T] = new Assembler[T]
+
+  implicit def intellijHack[T, R <: Recipe](in: Assembler[T]): R => () => T = ???
 }

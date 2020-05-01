@@ -54,7 +54,7 @@ lazy val `factorio-core` = (project in file("factorio-core")).
 
 lazy val `factorio-macro` = (project in file("factorio-macro")).
   settings(buildSettings ++ Seq(
-    name := "factorio-scalatest",
+    name := "factorio-macro",
     libraryDependencies ++= Seq(
       "org.scalatest" %% "scalatest" % scalatestVersion
     )
