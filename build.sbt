@@ -16,6 +16,7 @@ val buildSettings = Seq(
     "-language:higherKinds",
     "-language:postfixOps",
   ),
+  scalafmtOnCompile in ThisBuild := true,
   publishMavenStyle := true,
   publishArtifact in Test := false,
   pomIncludeRepository := { _ => false },

@@ -5,7 +5,6 @@ import javax.inject.Named
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-
 class AssemblyMacroSpec extends AnyFlatSpec with Matchers {
 
   "Assembly macro" should "assemble a simple app" in {
@@ -47,7 +46,7 @@ class AssemblyMacroSpec extends AnyFlatSpec with Matchers {
 
     val app = assembler()
 
-    app.repository should not be(repository)
+    app.repository should not be (repository)
     app.superComponent.repository shouldBe repository
   }
 
@@ -83,7 +82,7 @@ class AssemblyMacroSpec extends AnyFlatSpec with Matchers {
 
     val app = assembler()
 
-    app.that should not be(app.other)
+    app.that should not be (app.other)
   }
 
   it should "not compile when circular dependency exists" in {
