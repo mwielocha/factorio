@@ -19,7 +19,7 @@ class App(service: Service)
 
 val assembler = assemble[App](EmptyRecipe)
 
-val app = assemble()
+val app = assembler()
 
 // new App(new Service(new Repository)))
 
@@ -49,7 +49,7 @@ class AppRecipe extends Recipe {
 
 val assembler = assemble[App](new AppRecipe)
 
-val app = assemble()
+val app = assembler()
 
 // val recipe = new AppRecipe
 // new App(recipe.createService(new Repository)))
@@ -74,7 +74,7 @@ class AppRecipe extends Recipe {
 
 val assembler = assemble[App](new AppRecipe)
 
-val app = assemble()
+val app = assembler()
 
 // val recipe = new AppRecipe
 // new App(new ServiceImpl(new Repository)))
@@ -109,7 +109,7 @@ You can also provide multiple implementations with the `@named` discriminator:
  
  val assembler = assemble[App](new AppRecipe)
  
- val app = assemble()
+ val app = assembler()
  
  // val recipe = new AppRecipe
  // val repository = new Repository
@@ -134,7 +134,7 @@ class App(service: Service)
 
 val assembler = assemble[App](EmptyRecipe)
 
-val app = assemble()
+val app = assembler()
 
 // repository is now a def so new instance is injected to every parent
 // def repository = new Repository 
@@ -161,7 +161,7 @@ class AppRecipe extends Recipe {
 
 val assembler = assemble[App](new AppRecipe)
 
-val app = assemble()
+val app = assembler()
 
 // val recipe = new AppRecipe
 // def service = new ServiceImpl(new Repository)
