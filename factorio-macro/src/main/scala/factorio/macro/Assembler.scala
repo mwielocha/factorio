@@ -1,19 +1,19 @@
-package factorio.internal
+package factorio.`macro`
 
 import factorio.{ Binder, Provides }
 
 import scala.reflect.macros.blackbox
 
-class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](override val c: C) extends MacroToolbox[C] {
+class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
 
   import c.universe._
 
-  case class Assem(name: TermName, tree: Tree)
-  case class Named(tpe: Type, label: Option[String])
-  case class Const(tpe: Type, name: TermName, const: Symbol, label: Option[String])
+  private case class Assem(tname: TermName, tree: Tree)
+  private case class Named(tpe: Type, name: Option[String])
+  private case class Const(tpe: Type, tname: TermName, const: Symbol, name: Option[String])
 
-  type Binds = Map[Named, Type]
-  type Provs = Map[Named, Symbol]
+  private type Binds = Map[Named, Type]
+  private type Provs = Map[Named, Symbol]
 
   def apply(recipe: c.Expr[R]): Tree = {
 
@@ -25,8 +25,8 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     val prov = providerLookup(rtpe)
 
     val assemblies = assemblyTrees(tpe, rname, bind, prov)
-    val trees = assemblies.map { case Assem(_, tree) => tree }
-    val entry = assemblies.last.name
+    val trees = assemblies.map(_.tree)
+    val entry = assemblies.last.tname
 
     val output =
       q"""() => {

@@ -8,7 +8,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   "Assembly macro" should "assemble a simple app" in {
 
-    val assembler = assemble[TestApp, Unit](())
+    val assembler = assemble[TestApp](EmptyRecipe)
 
     val app = assembler()
     app.superComponent.repository shouldBe app.repository
@@ -18,13 +18,13 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     val component = new Component
 
-    class SimpleRecipe {
+    class AppRecipe extends Recipe {
       @Provides
       def getComponent: Component =
         component
     }
 
-    val assembler = assemble[TestApp, SimpleRecipe](new SimpleRecipe)
+    val assembler = assemble[TestApp](new AppRecipe)
 
     val app = assembler()
 
@@ -35,13 +35,13 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     val repository = new Repository
 
-    class SimpleRecipe {
+    class AppRecipe extends Recipe {
       @Provides
       def makeSuperComponent(component: Component): SuperComponent =
         new SuperComponent(component, repository)
     }
 
-    val assembler = assemble[TestApp, SimpleRecipe](new SimpleRecipe)
+    val assembler = assemble[TestApp](new AppRecipe)
 
     val app = assembler()
 
@@ -55,7 +55,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
       val bindSuperComponent = bind[SuperComponent].to[DefaultComponent]
     }
 
-    val assembler = assemble[TestApp, TestAppRecipe](new TestAppRecipe)
+    val assembler = assemble[TestApp](new TestAppRecipe)
 
     val app = assembler()
 
@@ -77,7 +77,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
         new Component
     }
 
-    val assembler = assemble[LabeledApp, LabeledAppRecipe](new LabeledAppRecipe)
+    val assembler = assemble[LabeledApp](new LabeledAppRecipe)
 
     val app = assembler()
 
@@ -85,6 +85,6 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "not compile when circular dependency exists" in {
-    assertDoesNotCompile("assemble[OtherCircularComponent]")
+    assertDoesNotCompile("assemble[OtherCircularComponent]()")
   }
 }
