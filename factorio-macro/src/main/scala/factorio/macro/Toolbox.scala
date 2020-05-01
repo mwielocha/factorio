@@ -1,5 +1,7 @@
 package factorio.`macro`
 
+import factorio.annotations.named
+
 import scala.reflect.macros.blackbox
 
 trait Toolbox[C <: blackbox.Context] {
@@ -33,11 +35,20 @@ trait Toolbox[C <: blackbox.Context] {
       s.annotations.exists(_.tree.tpe == a)
 
     def named: Option[String] = {
-      s.annotations
-        .filter(_.tree.tpe == typeOf[javax.inject.Named])
+      val scala = s.annotations
+        .filter(_.tree.tpe == typeOf[named])
         .flatMap(_.tree.children.tail.headOption)
-        .headOption.flatMap(_.children.lastOption)
-        .map(_.toString()).map(x => x.substring(1, x.length - 1))
+        .headOption
+
+      scala
+        .orElse {
+          // fallback to javax.inject.Named for backwards compatibility
+          s.annotations
+            .filter(_.tree.tpe == typeOf[javax.inject.Named])
+            .flatMap(_.tree.children.tail.headOption)
+            .headOption
+            .flatMap(_.children.lastOption)
+        }.map(_.toString()).map(x => x.substring(1, x.length - 1))
     }
   }
 

@@ -34,7 +34,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     val database = new Database
 
     class AppRecipe extends Recipe with ServiceRecipe {
-      @Provides
+      @provides
       def getDatabase: Database =
         database
     }
@@ -54,7 +54,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     val service = new ServiceImpl(repository)
 
     class AppRecipe extends Recipe with ServiceRecipe {
-      @Provides
+      @provides
       def createApp(otherService: OtherService): App =
         new App(service, otherService)
     }
@@ -74,13 +74,13 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     class MultiDatabaseRepositoryRecipe extends Recipe {
 
-      @Provides
-      @Named("database")
+      @provides
+      @named("database")
       def getDatabase =
         database
 
-      @Provides
-      @Named("otherDatabase")
+      @provides
+      @named("otherDatabase")
       def getOtherDatabase =
         otherDatabase
     }
@@ -91,6 +91,30 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     repository.database shouldBe database
     repository.otherDatabase shouldBe otherDatabase
+  }
+
+  it should "assemble an app from a recipe with named, binded components" in {
+
+    val thatClient: Client = new ThatClientImpl
+
+    class ServicesRecipe extends Recipe {
+
+      @provides
+      @named("that")
+      def getThatClient =
+        thatClient
+
+      @named("other")
+      val otherClientBinder = bind[Client].to[OtherClientImpl]
+    }
+
+    val assembler = assemble[Clients](new ServicesRecipe)
+
+    val clients = assembler()
+
+    clients.thatClient shouldBe thatClient
+    clients.otherClient should not be (thatClient)
+    clients.otherClient.getClass shouldBe classOf[OtherClientImpl]
   }
 
   it should "assemble an app from a recipe with replicated components" in {
@@ -111,8 +135,8 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     class ReplicatedRepositoryRecipe extends Recipe with ServiceRecipe {
 
-      @Provides
-      @Replicated
+      @provides
+      @replicated
       def newRepository(database: Database) =
         new Repository(database)
     }
@@ -123,6 +147,22 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     app.service.repository shouldNot be(app.otherService.repository)
     app.service.repository.database shouldBe app.otherService.repository.database
+  }
+
+  it should "assemble an app from a recipe with multiple composed annotations" in {
+
+    class AppRecipe extends Recipe with ServiceRecipe {
+      @provides
+      @replicated
+      def getDatabase: Database =
+        new Database
+    }
+
+    val assembler = assemble[App](new AppRecipe)
+
+    val app = assembler()
+
+    app.service.repository.database should not be (app.otherService.repository)
   }
 
   it should "not compile when circular dependency exists" in {

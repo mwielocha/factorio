@@ -1,3 +1,5 @@
-package factorio.annotations class named {
+package factorio.annotations
 
-}
+import scala.annotation.StaticAnnotation
+
+class named(name: String) extends StaticAnnotation

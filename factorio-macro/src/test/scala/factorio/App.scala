@@ -10,7 +10,7 @@ trait Service {
 
 class ServiceImpl(val repository: Repository) extends Service
 
-@Replicated
+@replicated
 class ReplicatedRepository(database: Database) extends Repository(database)
 
 trait OtherService {
@@ -22,6 +22,13 @@ class OtherServiceImpl(val repository: Repository) extends OtherService
 class App(val service: Service, val otherService: OtherService)
 
 class MultiDatabaseRepository(
-  @Named("database") val database: Database,
-  @Named("otherDatabase") val otherDatabase: Database
+  @named("database") val database: Database,
+  @named("otherDatabase") val otherDatabase: Database
 )
+
+trait Client
+
+class ThatClientImpl extends Client
+class OtherClientImpl(val repository: Repository) extends Client
+
+class Clients(@named("that") val thatClient: Client, @javax.inject.Named("other") val otherClient: Client)

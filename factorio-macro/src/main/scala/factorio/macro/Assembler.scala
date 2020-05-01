@@ -1,6 +1,6 @@
 package factorio.`macro`
 
-import factorio.{ Binder, Provides, Replicated }
+import factorio.annotations.{ provides, replicated }
 
 import scala.reflect.macros.blackbox
 
@@ -9,12 +9,17 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
   import c.universe._
 
   private case class Named(tpe: Type, name: Option[String])
-  private case class Assem(tname: TermName, tree: Tree, root: Boolean = false)
-  private case class Const(tpe: Type, tname: TermName, const: Symbol, props: Props)
-  private case class Props(name: Option[String] = None, replicated: Boolean = false, root: Boolean = false)
+  private case class Assembly(tpe: Type, tname: TermName, const: Symbol, props: Props)
+  private case class AssemblyTree(tname: TermName, tree: Tree, root: Boolean = false)
 
-  private case class Binder(tpe: Type, props: Props)
-  private case class Provider(sym: Symbol, props: Props)
+  private case class Props(
+    name: Option[String] = None,
+    replicated: Boolean = false,
+    root: Boolean = false
+  )
+
+  private case class Binder(targetType: Type, props: Props)
+  private case class Provider(symbol: Symbol, props: Props)
 
   private type Binders = Map[Named, Binder]
   private type Providers = Map[Named, Provider]
@@ -57,10 +62,10 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     rname: TermName,
     bind: Binders,
     prov: Providers
-  ): Seq[Assem] = {
+  ): Seq[AssemblyTree] = {
     import c.universe._
 
-    val trees = Seq.empty[Assem]
+    val trees = Seq.empty[AssemblyTree]
 
     val graph = constructDependencyGraph(bind, prov)(
       targetType,
@@ -70,18 +75,18 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     ).reverse
 
     graph.foldLeft(trees) {
-      case (trees, Const(targetType, fname, const, props)) =>
+      case (trees, Assembly(targetType, fname, const, props)) =>
         trees :+ {
           val args = const.asMethod.paramLists.map {
             _.flatMap { param =>
-              val ptpe = param.typeSignature.dealias
-              val plab = param.named
+              val named = param.named
+              val parameterType = param.typeSignature.dealias
 
               graph.find {
-                case Const(targetType, _, _, props) =>
-                  targetType == ptpe && plab == props.name
+                case Assembly(targetType, _, _, props) =>
+                  targetType == parameterType && named == props.name
               } match {
-                case Some(Const(_, name, _, _)) =>
+                case Some(Assembly(_, name, _, _)) =>
                   Some(q"""$name""")
                 case None => None
               }
@@ -95,18 +100,18 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
           val Binder(typeOrBindedType, propsOrBindedProps) =
             bind.getOrElse(named, Binder(targetType, props))
 
-          val constTree =
+          val assemblyTree =
             if (isConstructor) q"""new $typeOrBindedType(...$args)"""
             else q"""$rname.$const(...$args)"""
 
           val replicated = props.replicated || propsOrBindedProps.replicated ||
             prov.view.mapValues(_.props.replicated).getOrElse(named, false)
 
-          Assem(
+          AssemblyTree(
             fname,
             if (replicated) {
-              q"""def $fname: $targetType = $constTree"""
-            } else q"""lazy val $fname: $targetType = $constTree""",
+              q"""def $fname: $targetType = $assemblyTree"""
+            } else q"""lazy val $fname: $targetType = $assemblyTree""",
             propsOrBindedProps.root
           )
         }
@@ -120,15 +125,17 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     targetType: Type, // type
     props: Props,
     path: Seq[Type] = Seq.empty, //path from root
-    output: Seq[Const] = Seq.empty // output
-  ): Seq[Const] = {
+    output: Seq[Assembly] = Seq.empty // output
+  ): Seq[Assembly] = {
+
+    val isBinded = binders.contains(Named(targetType, props.name))
 
     val Binder(typeOrBindedType, propsOrBindedProps) =
       binders.getOrElse(Named(targetType, props.name), Binder(targetType, props))
 
     val propsWithReplicated = propsOrBindedProps.copy(
       replicated = props.replicated || typeOrBindedType.typeSymbol
-        .isAnnotatedWith(typeOf[Replicated])
+        .isAnnotatedWith(typeOf[replicated])
     )
 
     if (path.contains(typeOrBindedType))
@@ -136,41 +143,50 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
 
     val alreadyVisited = output.view
       .map {
-        case Const(visitedType, _, _, Props(name, _, _)) =>
+        case Assembly(visitedType, _, _, Props(name, _, _)) =>
           visitedType -> name
       }.to(Set)
 
-    if (alreadyVisited(typeOrBindedType -> propsWithReplicated.name)) output
-    else {
+    if (!alreadyVisited(typeOrBindedType -> props.name)) {
 
-      val const = propsWithReplicated.name match {
+      println(s"$typeOrBindedType (${props.name}) - isBinded: " + isBinded)
 
-        case nameOrNone @ Some(name) =>
+      val const = props.name match {
+
+        case nameOrNone @ Some(name) if !isBinded =>
           providers.view
-            .mapValues(_.sym).getOrElse(
+            .mapValues(_.symbol).getOrElse(
               Named(typeOrBindedType, nameOrNone),
               c.abort(
                 c.enclosingPosition,
                 Error(
-                  s"Proivider not found for an instance of [${Console.YELLOW}$typeOrBindedType${Console.RED}] " +
-                    s"labeled with [${Console.YELLOW}$name${Console.RED}]"
+                  s"Proivider not found for an instance of " +
+                    s"[${Console.YELLOW}$typeOrBindedType${Console.RED}] " +
+                    s"discriminated with [${Console.YELLOW}$name${Console.RED}]"
                 )
               )
             )
 
-        case None =>
+        case _ =>
           providers.view
-            .mapValues(_.sym).getOrElse(
+            .mapValues(_.symbol).getOrElse(
               Named(typeOrBindedType, propsWithReplicated.name),
               discoverConstructor(typeOrBindedType)
                 .getOrElse {
-                  c.abort(c.enclosingPosition, Error(s"Cannot construct an instance of [${Console.YELLOW}$typeOrBindedType${Console.RED}]"))
+                  c.abort(
+                    c.enclosingPosition,
+                    Error(
+                      s"Cannot construct an instance of " +
+                        s"[${Console.YELLOW}$typeOrBindedType${Console.RED}]"
+                    )
+                  )
                 }
             )
+
       }
 
       val targetTermName = uname(typeOrBindedType, propsWithReplicated.name)
-      val newOut = output :+ Const(targetType, targetTermName, const, propsWithReplicated)
+      val newOut = output :+ Assembly(targetType, targetTermName, const, propsWithReplicated)
 
       const.asMethod.paramLists.foldLeft(newOut) {
         case (out, list) =>
@@ -178,28 +194,29 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
             case (out, parameter) =>
               val parameterType = parameter.typeSignature.dealias
               val name = parameter.named
+
               val props = Props(name)
               constructDependencyGraph(binders, providers)(parameterType, props, path :+ typeOrBindedType, out)
           }
 
       }
-    }
+    } else output
   }
 
-  private def providerLookup(rtpe: Type): Providers = {
+  private def providerLookup(recipeType: Type): Providers = {
 
     val providers = Map.empty[Named, Provider]
 
-    rtpe.baseClasses.foldLeft(providers) {
-      case (acc, clazz) =>
-        clazz.typeSignature.members.foldLeft(acc) {
-          case (acc, m) =>
-            if (m.isMethod && m.isPublic && m.isAnnotatedWith(typeOf[Provides])) {
-              val targetType = m.typeSignature.resultType.dealias
+    recipeType.baseClasses.foldLeft(providers) {
+      case (acc, baseClassSymbol) =>
+        baseClassSymbol.typeSignature.members.foldLeft(acc) {
+          case (acc, member) =>
+            if (member.isMethod && member.isPublic && member.isAnnotatedWith(typeOf[provides])) {
+              val targetType = member.typeSignature.resultType.dealias
 
-              val name = m.named
-              val replicated = m.isAnnotatedWith(typeOf[Replicated])
-              val provider = Provider(m, Props(name, replicated))
+              val name = member.named
+              val replicated = member.isAnnotatedWith(typeOf[replicated])
+              val provider = Provider(member, Props(name, replicated))
 
               acc + (Named(targetType, name) -> provider)
             } else acc
@@ -207,7 +224,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     }
   }
 
-  private def binderLookup(rtpe: Type): Binders = {
+  private def binderLookup(recipeType: Type): Binders = {
     import c.universe._
 
     val binders = Map.empty[Named, Binder]
@@ -215,16 +232,17 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
     def isBinder(m: Symbol): Boolean =
       m.typeSignature.resultType.erasure == typeOf[factorio.Binder[_, _]].erasure
 
-    rtpe.baseClasses.foldLeft(binders) {
-      case (acc, clazz) =>
-        clazz.typeSignature.members.foldLeft(acc) {
-          case (acc, m) =>
-            if (m.isMethod && m.isTerm && isBinder(m)) {
-              val targetType :: bindedType :: Nil = m.typeSignature.resultType.typeArgs
+    recipeType.baseClasses.foldLeft(binders) {
+      case (acc, baseClassSymbol) =>
+        baseClassSymbol.typeSignature.members.foldLeft(acc) {
+          case (acc, member) =>
+            if (member.isTerm && isBinder(member)) {
+              val targetType :: bindedType :: Nil = member.typeSignature.resultType.typeArgs
                 .map(_.dealias)
 
-              val name = m.named
-              val replicated = m.isAnnotatedWith(typeOf[Replicated])
+              val name = member.named
+
+              val replicated = member.isAnnotatedWith(typeOf[replicated])
               val binder = Binder(bindedType, Props(name, replicated))
 
               acc + (Named(targetType, name) -> binder)

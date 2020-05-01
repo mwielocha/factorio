@@ -2,7 +2,9 @@ package factorio
 
 trait Syntax {
 
-  type Named = javax.inject.Named
+  type named = annotations.named
+  type provides = annotations.provides
+  type replicated = annotations.replicated
 
   object EmptyRecipe extends Recipe
 

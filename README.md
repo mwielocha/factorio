@@ -41,7 +41,7 @@ class App(service: Service)
 
 class AppRecipe extends Recipe {
   
-  @Provides
+  @provides
   def createService(repository: Repository): Service = {
     new Service(repository)
   }
@@ -80,7 +80,7 @@ val app = assemble()
 // new App(new ServiceImpl(new Repository)))
 
 ```
-You can also provide multiple implementations with the `@Named` discriminator:
+You can also provide multiple implementations with the `@named` discriminator:
  ```scala
  
  import factorio._
@@ -91,17 +91,17 @@ You can also provide multiple implementations with the `@Named` discriminator:
  class ServiceImpl(val repository: Repository) extends Service
  
  class App(
-  @Named("that") thatService: Service, 
-  @Named("other") otherService: Service
+  @named("that") thatService: Service, 
+  @named("other") otherService: Service
 )
  
  class AppRecipe extends Recipe {
    
-   @Named("that")
+   @named("that")
    def thatService(repository: Repository) =
      new ServiceImpl(repository) 
    
-   @Named("other")
+   @named("other")
    def otherService(repository: Repository) =
      new ServiceImpl(repository)
 
@@ -119,6 +119,56 @@ You can also provide multiple implementations with the `@Named` discriminator:
  // )
  
  ```
+Scala style `@named` annotation can be replaced with `javax.inject.Named` 
+### Non-singleton components
+Following on the assumption that everything is a `Singleton` we need to reverse `javax.inject` logic and introduce a non-singleton annotation `@replicated`:
+```scala
+
+import factorio._
+
+@replicated
+class Repository
+class Service(val repository: Repository)
+
+class App(service: Service)
+
+val assemble = assembler[App](EmptyRecipe)
+
+val app = assemble()
+
+// repository is now a def so new instance is injected to every parent
+// def repository = new Repository 
+// new App(new Service(repository)))
+
+```
+Annotations can be composed in order to combine effects:
+```scala
+
+import factorio._
+
+class Repository
+trait Service
+class ServiceImpl(val repository: Repository) extends Service
+
+class App(service: Service)
+
+class AppRecipe extends Recipe {
+  
+  @replicated
+  val serviceBinder = bind[Service].to[ServiceImpl]
+
+}
+
+val assemble = assembler[App](new AppRecipe)
+
+val app = assemble()
+
+// val recipe = new AppRecipe
+// def service = new ServiceImpl(new Repository)
+// new App(service)
+
+```
+
 ### Dependency graph corectness
 Factorio will validate the corectness of the dependency graph in compile time and will abort compilation on any given error:
 ```scala
