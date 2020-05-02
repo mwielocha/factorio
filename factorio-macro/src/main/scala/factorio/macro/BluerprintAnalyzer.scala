@@ -18,7 +18,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
   case class Blueprint(
     binders: Map[Named[Type], Binder],
-    provider: Map[Named[Type], Provider]
+    providers: Map[Named[Type], Provider]
   )
 
   def isBinder(m: Symbol): Boolean =

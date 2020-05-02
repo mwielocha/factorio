@@ -11,7 +11,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
   private final val bluerprintAnalyzer =
     new BluerprintAnalyzer[c.type, B](c)(weakTypeTag[B])
 
-  import bluerprintAnalyzer.{ Provider, Binder, Blueprint }
+  import bluerprintAnalyzer.{ Binder, Blueprint }
 
   private case class Assembly(tpe: Type, tname: TermName, const: Symbol, props: Props)
   private case class AssemblyTree(tname: TermName, tree: Tree, root: Boolean = false)
@@ -24,9 +24,9 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
     val blueprintTargetType = weakTypeTag[B].tpe.dealias
     val blueprintTermName = uname(blueprintTargetType)
 
-    val Blueprint(binders, providers) = bluerprintAnalyzer.blueprintAnalysis
+    val blueprint = bluerprintAnalyzer.blueprintAnalysis
 
-    val assemblies = assemblyTrees(targetType, blueprintTermName, binders, providers)
+    val assemblies = assemblyTrees(targetType, blueprintTermName, blueprint)
     val trees = assemblies.map(_.tree)
 
     val root = assemblies
@@ -65,14 +65,13 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
   private def assemblyTrees(
     targetType: Type,
     rname: TermName,
-    binders: Map[Named[Type], Binder],
-    providers: Map[Named[Type], Provider]
+    blueprint: Blueprint
   ): Seq[AssemblyTree] = {
     import c.universe._
 
     val trees = Seq.empty[AssemblyTree]
 
-    val graph = constructDependencyGraph(binders, providers)(
+    val graph = constructDependencyGraph(blueprint)(
       targetType,
       Props(root = true),
       Seq.empty,
@@ -103,14 +102,14 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
           val isConstructor = const.asMethod.isConstructor
 
           val Binder(typeOrBindedType, propsOrBindedProps) =
-            binders.getOrElse(named, Binder(targetType, props))
+            blueprint.binders.getOrElse(named, Binder(targetType, props))
 
           val assemblyTree =
             if (isConstructor) q"""new $typeOrBindedType(...$args)"""
             else q"""$rname.$const(...$args)"""
 
           val replicated = props.repl || propsOrBindedProps.repl ||
-            providers.view.mapValues(_.props.repl).getOrElse(named, false)
+            blueprint.providers.view.mapValues(_.props.repl).getOrElse(named, false)
 
           AssemblyTree(
             fname,
@@ -124,8 +123,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
   }
 
   private def constructDependencyGraph(
-    binders: Map[Named[Type], Binder] = Map.empty,
-    providers: Map[Named[Type], Provider] = Map.empty
+    blueprint: Blueprint
   )(
     targetType: Type, // type
     props: Props,
@@ -133,10 +131,10 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
     output: Seq[Assembly] = Seq.empty // output
   ): Seq[Assembly] = {
 
-    val isBinded = binders.contains(Named(targetType, props.name))
+    val isBinded = blueprint.binders.contains(Named(targetType, props.name))
 
     val Binder(typeOrBindedType, propsOrBindedProps) =
-      binders.getOrElse(Named(targetType, props.name), Binder(targetType, props))
+      blueprint.binders.getOrElse(Named(targetType, props.name), Binder(targetType, props))
 
     val propsWithReplicated = propsOrBindedProps.copy(
       repl = props.repl || typeOrBindedType.typeSymbol
@@ -157,7 +155,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
       val const = props.name match {
 
         case nameOrNone @ Some(name) if !isBinded =>
-          providers.view
+          blueprint.providers.view
             .mapValues(_.sym).getOrElse(
               Named(typeOrBindedType, nameOrNone),
               c.abort(
@@ -171,7 +169,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
             )
 
         case _ =>
-          providers.view
+          blueprint.providers.view
             .mapValues(_.sym).getOrElse(
               Named(typeOrBindedType, propsWithReplicated.name),
               discoverConstructor(typeOrBindedType)
@@ -199,7 +197,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
               val name = parameter.named
 
               val props = Props(name)
-              constructDependencyGraph(binders, providers)(parameterType, props, path :+ typeOrBindedType, out)
+              constructDependencyGraph(blueprint)(parameterType, props, path :+ typeOrBindedType, out)
           }
 
       }
