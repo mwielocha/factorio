@@ -4,10 +4,10 @@ import scala.reflect.macros.blackbox
 
 object AssemblerMacro {
 
-  def assemble[T : c.WeakTypeTag, R : c.WeakTypeTag](c: blackbox.Context)(r: c.Expr[R]): c.Expr[() => T] = {
+  def assemble[T : c.WeakTypeTag, B : c.WeakTypeTag](c: blackbox.Context)(blueprint: c.Expr[B]): c.Expr[() => T] = {
     c.Expr[() => T] {
-      new factorio.`macro`.Assembler[c.type, T, R](c)
-        .assemble(r)
+      new factorio.`macro`.Assembler[c.type, T, B](c)
+        .assemble(blueprint)
     }
   }
 }

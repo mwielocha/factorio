@@ -5,8 +5,8 @@ import org.scalatest.matchers.should.Matchers
 
 class AssemblerSpec extends AnyFlatSpec with Matchers {
 
-  trait ServiceRecipe {
-    requires: Recipe =>
+  @blueprint
+  trait ServiceBlueprint {
 
     val serviceBinder = bind[Service].to[ServiceImpl]
     val otherServiceBinder = bind[OtherService].to[OtherServiceImpl]
@@ -15,7 +15,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   "Assembly macro" should "assemble a component" in {
 
-    val assembler = assemble[Repository](EmptyRecipe)
+    val assembler = assemble[Repository](Blank)
 
     assembler()
     succeed
@@ -23,23 +23,25 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   it should "assemble a simple app" in {
 
-    val assembler = assemble[App](new Recipe with ServiceRecipe)
+    val assembler = assemble[App](new ServiceBlueprint {})
 
     val app = assembler()
     app.service.repository shouldBe app.otherService.repository
   }
 
-  it should "assemble an app from a recipe with a simple @provides method" in {
+  it should "assemble an app from a blueprint with a simple @provides method" in {
 
     val database = new Database
 
-    class AppRecipe extends Recipe with ServiceRecipe {
+    @blueprint
+    class AppBlueprint extends ServiceBlueprint {
+
       @provides
       def getDatabase: Database =
         database
     }
 
-    val assembler = assemble[App](new AppRecipe)
+    val assembler = assemble[App](new AppBlueprint)
 
     val app = assembler()
 
@@ -47,19 +49,21 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     app.otherService.repository.database shouldBe database
   }
 
-  it should "assemble an app from a recipe with a complex @provides method" in {
+  it should "assemble an app from a blueprint with a complex @provides method" in {
 
     val database = new Database
     val repository = new Repository(database)
     val service = new ServiceImpl(repository)
 
-    class AppRecipe extends Recipe with ServiceRecipe {
+    @blueprint
+    class AppBlueprint extends ServiceBlueprint {
+
       @provides
       def createApp(otherService: OtherService): App =
         new App(service, otherService)
     }
 
-    val assembler = assemble[App](new AppRecipe)
+    val assembler = assemble[App](new AppBlueprint)
 
     val app = assembler()
 
@@ -67,12 +71,13 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     app.otherService.repository should not be (repository)
   }
 
-  it should "assemble an app from a recipe with named components" in {
+  it should "assemble an app from a blueprint with named components" in {
 
     val database = new Database
     val otherDatabase = new Database
 
-    class MultiDatabaseRepositoryRecipe extends Recipe {
+    @blueprint
+    class MultiDatabaseRepositoryBlueprint {
 
       @provides
       @named("database")
@@ -85,7 +90,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
         otherDatabase
     }
 
-    val assembler = assemble[MultiDatabaseRepository](new MultiDatabaseRepositoryRecipe)
+    val assembler = assemble[MultiDatabaseRepository](new MultiDatabaseRepositoryBlueprint)
 
     val repository = assembler()
 
@@ -93,11 +98,12 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     repository.otherDatabase shouldBe otherDatabase
   }
 
-  it should "assemble an app from a recipe with named, binded components" in {
+  it should "assemble an app from a blueprint with named, binded components" in {
 
     val thatClient: Client = new ThatClientImpl
 
-    class ServicesRecipe extends Recipe {
+    @blueprint
+    class ServicesBlueprint {
 
       @provides
       @named("that")
@@ -108,7 +114,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
       val otherClientBinder = bind[Client].to[OtherClientImpl]
     }
 
-    val assembler = assemble[Clients](new ServicesRecipe)
+    val assembler = assemble[Clients](new ServicesBlueprint)
 
     val clients = assembler()
 
@@ -117,13 +123,14 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     clients.otherClient.getClass shouldBe classOf[OtherClientImpl]
   }
 
-  it should "assemble an app from a recipe with replicated components" in {
+  it should "assemble an app from a blueprint with replicated components" in {
 
-    class ReplicatedServiceRecipe extends Recipe with ServiceRecipe {
+    @blueprint
+    class ReplicatedServiceBlueprint extends ServiceBlueprint {
       val bindRepository = bind[Repository].to[ReplicatedRepository]
     }
 
-    val assembler = assemble[App](new ReplicatedServiceRecipe)
+    val assembler = assemble[App](new ReplicatedServiceBlueprint)
 
     val app = assembler()
 
@@ -131,9 +138,10 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     app.service.repository.database shouldBe app.otherService.repository.database
   }
 
-  it should "assemble an app from a recipe with replicated, provided component" in {
+  it should "assemble an app from a blueprint with replicated, provided component" in {
 
-    class ReplicatedRepositoryRecipe extends Recipe with ServiceRecipe {
+    @blueprint
+    class ReplicatedRepositoryBlueprint extends ServiceBlueprint {
 
       @provides
       @replicated
@@ -141,7 +149,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
         new Repository(database)
     }
 
-    val assembler = assemble[App](new ReplicatedRepositoryRecipe)
+    val assembler = assemble[App](new ReplicatedRepositoryBlueprint)
 
     val app = assembler()
 
@@ -149,16 +157,18 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     app.service.repository.database shouldBe app.otherService.repository.database
   }
 
-  it should "assemble an app from a recipe with multiple composed annotations" in {
+  it should "assemble an app from a blueprint with multiple composed annotations" in {
 
-    class AppRecipe extends Recipe with ServiceRecipe {
+    @blueprint
+    class AppBlueprint extends ServiceBlueprint {
+
       @provides
       @replicated
       def getDatabase: Database =
         new Database
     }
 
-    val assembler = assemble[App](new AppRecipe)
+    val assembler = assemble[App](new AppBlueprint)
 
     val app = assembler()
 
@@ -166,12 +176,12 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "not compile when circular dependency exists" in {
-    //assemble[CircularDependency](EmptyRecipe)
-    assertDoesNotCompile("assemble[CircularDependency](EmptyRecipe)")
+    //assemble[CircularDependency](EmptyBlueprint)
+    assertDoesNotCompile("assemble[CircularDependency](EmptyBlueprint)")
   }
 
   it should "not compile when no binding was provided for an interface" in {
-    //assemble[App](EmptyRecipe)
-    assertDoesNotCompile("assemble[App](EmptyRecipe)")
+    //assemble[App](EmptyBlueprint)
+    assertDoesNotCompile("assemble[App](EmptyBlueprint)")
   }
 }

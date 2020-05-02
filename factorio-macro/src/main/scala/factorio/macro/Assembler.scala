@@ -4,36 +4,29 @@ import factorio.annotations.{ provides, replicated }
 
 import scala.reflect.macros.blackbox
 
-class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
+class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
 
   import c.universe._
 
-  private case class Named(tpe: Type, name: Option[String])
+  private final val bluerprintAnalyzer =
+    new BluerprintAnalyzer[c.type, B](c)(weakTypeTag[B])
+
+  import bluerprintAnalyzer.{ Provider, Binder, Blueprint }
+
   private case class Assembly(tpe: Type, tname: TermName, const: Symbol, props: Props)
   private case class AssemblyTree(tname: TermName, tree: Tree, root: Boolean = false)
 
-  private case class Props(
-    name: Option[String] = None,
-    replicated: Boolean = false,
-    root: Boolean = false
-  )
+  def assemble(recipe: c.Expr[B]): Tree = {
 
-  private case class Binder(targetType: Type, props: Props)
-  private case class Provider(symbol: Symbol, props: Props)
-
-  private type Binders = Map[Named, Binder]
-  private type Providers = Map[Named, Provider]
-
-  def assemble(recipe: c.Expr[R]): Tree = {
+    val stopWatch = StopWatch()
 
     val targetType = weakTypeTag[T].tpe.dealias
-    val recipeTargetType = weakTypeTag[R].tpe.dealias
-    val recipeTermName = uname(recipeTargetType)
+    val blueprintTargetType = weakTypeTag[B].tpe.dealias
+    val blueprintTermName = uname(blueprintTargetType)
 
-    val binders = binderLookup(recipeTargetType)
-    val providers = providerLookup(recipeTargetType)
+    val Blueprint(binders, providers) = bluerprintAnalyzer.blueprintAnalysis
 
-    val assemblies = assemblyTrees(targetType, recipeTermName, binders, providers)
+    val assemblies = assemblyTrees(targetType, blueprintTermName, binders, providers)
     val trees = assemblies.map(_.tree)
 
     val root = assemblies
@@ -48,7 +41,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
 
     val output =
       q"""() => {
-          val $recipeTermName: $recipeTargetType = $recipe
+          val $blueprintTermName: $blueprintTargetType = $recipe
          ..$trees
          $root
       }"""
@@ -57,10 +50,12 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
       .toString().split("\n")
       .mkString(Console.GREEN, s"\n${Console.GREEN}", Console.RESET)
 
+    val elapsed = stopWatch()
+
     c.info(
       c.enclosingPosition,
-      s"\n[Factorio]:" +
-        s"\nGenerated output:\n${verbose}",
+      s"\n${Console.YELLOW}[Factorio]:" +
+        s"\n${Console.YELLOW}Done in $elapsed.\n${verbose}",
       force = false
     )
 
@@ -70,14 +65,14 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
   private def assemblyTrees(
     targetType: Type,
     rname: TermName,
-    bind: Binders,
-    prov: Providers
+    binders: Map[Named[Type], Binder],
+    providers: Map[Named[Type], Provider]
   ): Seq[AssemblyTree] = {
     import c.universe._
 
     val trees = Seq.empty[AssemblyTree]
 
-    val graph = constructDependencyGraph(bind, prov)(
+    val graph = constructDependencyGraph(binders, providers)(
       targetType,
       Props(root = true),
       Seq.empty,
@@ -108,14 +103,14 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
           val isConstructor = const.asMethod.isConstructor
 
           val Binder(typeOrBindedType, propsOrBindedProps) =
-            bind.getOrElse(named, Binder(targetType, props))
+            binders.getOrElse(named, Binder(targetType, props))
 
           val assemblyTree =
             if (isConstructor) q"""new $typeOrBindedType(...$args)"""
             else q"""$rname.$const(...$args)"""
 
-          val replicated = props.replicated || propsOrBindedProps.replicated ||
-            prov.view.mapValues(_.props.replicated).getOrElse(named, false)
+          val replicated = props.repl || propsOrBindedProps.repl ||
+            providers.view.mapValues(_.props.repl).getOrElse(named, false)
 
           AssemblyTree(
             fname,
@@ -129,8 +124,8 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
   }
 
   private def constructDependencyGraph(
-    binders: Binders = Map.empty,
-    providers: Providers = Map.empty
+    binders: Map[Named[Type], Binder] = Map.empty,
+    providers: Map[Named[Type], Provider] = Map.empty
   )(
     targetType: Type, // type
     props: Props,
@@ -144,7 +139,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
       binders.getOrElse(Named(targetType, props.name), Binder(targetType, props))
 
     val propsWithReplicated = propsOrBindedProps.copy(
-      replicated = props.replicated || typeOrBindedType.typeSymbol
+      repl = props.repl || typeOrBindedType.typeSymbol
         .isAnnotatedWith(typeOf[replicated])
     )
 
@@ -163,7 +158,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
 
         case nameOrNone @ Some(name) if !isBinded =>
           providers.view
-            .mapValues(_.symbol).getOrElse(
+            .mapValues(_.sym).getOrElse(
               Named(typeOrBindedType, nameOrNone),
               c.abort(
                 c.enclosingPosition,
@@ -177,7 +172,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
 
         case _ =>
           providers.view
-            .mapValues(_.symbol).getOrElse(
+            .mapValues(_.sym).getOrElse(
               Named(typeOrBindedType, propsWithReplicated.name),
               discoverConstructor(typeOrBindedType)
                 .getOrElse {
@@ -209,53 +204,5 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
 
       }
     } else output
-  }
-
-  private def providerLookup(recipeType: Type): Providers = {
-
-    val providers = Map.empty[Named, Provider]
-
-    recipeType.baseClasses.foldLeft(providers) {
-      case (acc, baseClassSymbol) =>
-        baseClassSymbol.typeSignature.members.foldLeft(acc) {
-          case (acc, member) =>
-            if (member.isMethod && member.isPublic && member.isAnnotatedWith(typeOf[provides])) {
-              val targetType = member.typeSignature.resultType.dealias
-
-              val name = member.named
-              val replicated = member.isAnnotatedWith(typeOf[replicated])
-              val provider = Provider(member, Props(name, replicated))
-
-              acc + (Named(targetType, name) -> provider)
-            } else acc
-        }
-    }
-  }
-
-  private def binderLookup(recipeType: Type): Binders = {
-    import c.universe._
-
-    val binders = Map.empty[Named, Binder]
-
-    def isBinder(m: Symbol): Boolean =
-      m.typeSignature.resultType.erasure == typeOf[factorio.Binder[_, _]].erasure
-
-    recipeType.baseClasses.foldLeft(binders) {
-      case (acc, baseClassSymbol) =>
-        baseClassSymbol.typeSignature.members.foldLeft(acc) {
-          case (acc, member) =>
-            if (member.isTerm && isBinder(member)) {
-              val targetType :: bindedType :: Nil = member.typeSignature.resultType.typeArgs
-                .map(_.dealias)
-
-              val name = member.named
-
-              val replicated = member.isAnnotatedWith(typeOf[replicated])
-              val binder = Binder(bindedType, Props(name, replicated))
-
-              acc + (Named(targetType, name) -> binder)
-            } else acc
-        }
-    }
   }
 }

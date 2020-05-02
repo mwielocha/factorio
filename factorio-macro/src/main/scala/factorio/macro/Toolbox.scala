@@ -4,7 +4,7 @@ import factorio.annotations.named
 
 import scala.reflect.macros.blackbox
 
-trait Toolbox[C <: blackbox.Context] {
+trait Toolbox[+C <: blackbox.Context] {
 
   val c: C
   import c.universe._
@@ -31,8 +31,8 @@ trait Toolbox[C <: blackbox.Context] {
 
   private[`macro`] implicit class SymbolExtension(s: Symbol) {
 
-    def isAnnotatedWith(a: Type): Boolean =
-      s.annotations.exists(_.tree.tpe == a)
+    def isAnnotatedWith(annotations: Type*): Boolean =
+      s.annotations.exists(t => annotations.contains(t.tree.tpe))
 
     def named: Option[String] = {
       val scala = s.annotations
