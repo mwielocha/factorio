@@ -181,7 +181,7 @@ trait TestRepositoryBlueprint {
 // this will overwirte reposiry provider from `RepositoryBlueprint`
 trait TestBlueprint extends TestRepositoryBlueprint with Blueprint 
 
-val testAssembler = Assembler[App](new TestBlueprint)
+val testAssembler = Assembler[App](new TestBlueprint {})
 
 val testApp = testAssembler()
 
