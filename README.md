@@ -160,9 +160,9 @@ trait ServiceBlueprint {
   }
 }
 
-class Blueprint extends ServiceBlueprint with RepositoryBlueprint
+trait Blueprint extends ServiceBlueprint with RepositoryBlueprint
 
-val assembler = Assembler[App](new AppBlueprint)
+val assembler = Assembler[App](new Blueprint {})
 
 val app = assembler()
 
@@ -179,7 +179,7 @@ trait TestRepositoryBlueprint {
 }
 
 // this will overwirte reposiry provider from `RepositoryBlueprint`
-class TestBlueprint extends Blueprint with TestRepositoryBlueprint
+trait TestBlueprint extends TestRepositoryBlueprint with Blueprint 
 
 val testAssembler = Assembler[App](new TestBlueprint)
 
