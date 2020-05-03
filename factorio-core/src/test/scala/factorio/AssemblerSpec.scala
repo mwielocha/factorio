@@ -175,6 +175,28 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     app.service.repository.database should not be (app.otherService.repository)
   }
 
+  it should "honor the order of blueprints (reverse to order of mixing folding)" in {
+
+    @blueprint
+    trait MemberBlueprint {
+      private val memberBinder = bind[Member].to[MemberImpl]
+    }
+
+    @blueprint
+    trait OtherMemberBlueprint {
+      private val memberBinder = bind[Member].to[OtherMemberImpl]
+    }
+
+    val assembler = Assembler[Package](new MemberBlueprint with OtherMemberBlueprint {})
+    val otherAssembler = Assembler[Package](new OtherMemberBlueprint with MemberBlueprint {})
+
+    val instance: Package = assembler()
+    val otherInstance: Package = otherAssembler()
+
+    instance.member.getClass shouldBe classOf[OtherMemberImpl]
+    otherInstance.member.getClass shouldBe classOf[MemberImpl]
+  }
+
   it should "not compile when circular dependency exists" in {
     //Assembler[CircularDependency](Blank)
     assertDoesNotCompile("Assembler[CircularDependency](EmptyBlueprint)")

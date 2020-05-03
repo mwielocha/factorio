@@ -11,7 +11,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
   val blueprintBaseType = weakTypeTag[R].tpe
 
   lazy val blueprintBaseClassSymbols: List[Symbol] =
-    blueprintBaseType.baseClasses.filter(_.isAnnotatedWith(typeOf[blueprint]))
+    blueprintBaseType.baseClasses.filter(_.isAnnotatedWith(typeOf[blueprint])).reverse
 
   case class Binder(`type`: Type, props: Props)
   case class Provider(symbol: Symbol, props: Props)
