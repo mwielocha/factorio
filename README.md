@@ -53,8 +53,8 @@ val assembler = Assembler[App](new Blueprint)
 
 val app = assembler()
 
-// val recipe = new Blueprint
-// new App(recipe.createService(new Repository)))
+// val blueprint = new Blueprint
+// new App(blueprint.createService(new Repository)))
 
 ```
 
