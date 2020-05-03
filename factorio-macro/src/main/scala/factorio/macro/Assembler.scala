@@ -22,44 +22,39 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
   private lazy val blueprintTermName = uname(blueprintType)
 
   type ArgumentLists = List[List[TermName]]
-  type ParameterLists = List[List[Type]]
-  type NamedParameterLists = List[List[Named[Type]]]
+  type ParameterLists = List[List[Named[Type]]]
 
-  private abstract class Assembly {
-    def `type`: Type
-    def props: Props
-    def parameterLists: NamedParameterLists
-    lazy val tname = uname(`type`, props.name)
-    def assemble: ArgumentLists => Tree
+  private abstract class Assembly(
+    val `type`: Type,
+    val props: Props,
+    val parameterLists: ParameterLists
+  ) {
+
+    val tname = uname(`type`, props.name)
+    def createTree: ArgumentLists => Tree
+
+    val assignTree: ArgumentLists => Tree =
+      args =>
+        // if the type is marker as replicated we create a def instead of a lazy val
+        if (props.repl) function(tname, createTree(args))
+        else lazyValue(tname, createTree(args))
   }
 
-  private case class ProvidedAssembly(
-    `type`: Type,
-    symbol: Symbol,
-    props: Props,
-    parameterLists: NamedParameterLists
-  ) extends Assembly {
+  private object Assembly {
 
-    override val assemble: ArgumentLists => Tree = {
-      case args if props.repl =>
-        q"""def $tname = $blueprintTermName.$symbol(...$args)"""
-      case args =>
-        q"""lazy val $tname = $blueprintTermName.$symbol(...$args)"""
-    }
-  }
+    // constructor-based assembly
+    def apply(`type`: Type, props: Props)(parameterLists: ParameterLists): Assembly =
+      new Assembly(`type`, props, parameterLists) {
+        override val createTree: ArgumentLists => Tree =
+          args => q"new ${`type`}(...$args)"
+      }
 
-  private case class ConstructorAssembly(
-    `type`: Type,
-    props: Props,
-    parameterLists: NamedParameterLists
-  ) extends Assembly {
-
-    override val assemble: ArgumentLists => Tree = {
-      case args if props.repl =>
-        q"""def $tname = new ${`type`}(...$args)"""
-      case args =>
-        q"""lazy val $tname = new ${`type`}(...$args)"""
-    }
+    // blueprint provider-based assembly
+    def apply(`type`: Type, symbol: Symbol, props: Props)(parameterLists: ParameterLists): Assembly =
+      new Assembly(`type`, props, parameterLists) {
+        override val createTree: ArgumentLists => Tree =
+          args => q"$blueprintTermName.$symbol(...$args)"
+      }
   }
 
   private case class AssemblyTree(tname: TermName, tree: Tree, root: Boolean = false)
@@ -125,14 +120,19 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
               named,
               c.abort(
                 c.enclosingPosition,
-                Error(s"Couldn't create an instance of [{}] when constructing [{}]", named, assembly.`type`)(Nil)
+                Error(
+                  s"Couldn't create an instance of [{}] " +
+                    s"when constructing [{}]",
+                  named,
+                  assembly.`type`
+                )(Nil)
               )
             ).tname
         }
       }
       tree = AssemblyTree(
         assembly.tname,
-        assembly.assemble(arguments),
+        assembly.assignTree(arguments),
         root = assembly.props.root
       )
     } yield trees add tree
@@ -178,7 +178,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
         // we have a provide, let's create an assembly
 
         val paramLists = symbol.asMethod.paramLists.namedTypeSignatures
-        val assembly = ProvidedAssembly(`type`, symbol, newProps || props, paramLists)
+        val assembly = Assembly(`type`, symbol, newProps || props)(paramLists)
         val newOutput = output + (bindedIndentifier -> assembly)
 
         analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
@@ -213,14 +213,14 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
         // if yes then let's create an assembly
 
         val paramLists = constructor.asMethod.paramLists.namedTypeSignatures
-        val assembly = ConstructorAssembly(bindedType, newProps, paramLists)
+        val assembly = Assembly(bindedType, newProps)(paramLists)
         val newOutput = output + (Named(`type`, newProps.name) -> assembly)
         analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
     }
   }
 
   private def analyzeParameterLists(
-    parameterLists: NamedParameterLists,
+    parameterLists: ParameterLists,
     rootPath: Seq[Type],
     output: Map[Named[Type], Assembly]
   ): Map[Named[Type], Assembly] = {
