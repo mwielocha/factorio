@@ -41,7 +41,7 @@ class Service(val repository: Repository)
 class App(service: Service)
 
 @blueprint
-class AppBlueprint {
+class Blueprint {
   
   @provides
   def createService(repository: Repository): Service = {
@@ -49,11 +49,11 @@ class AppBlueprint {
   }
 }
 
-val assembler = Assembler[App](new AppRecipe)
+val assembler = Assembler[App](new Blueprint)
 
 val app = assembler()
 
-// val recipe = new AppRecipe
+// val recipe = new Blueprint
 // new App(recipe.createService(new Repository)))
 
 ```
@@ -70,17 +70,17 @@ class ServiceImpl(val repository: Repository) extends Service
 class App(service: Service)
 
 @blueprint
-class AppBlueprint {
+class Blueprint {
   
   val serviceBinder = bind[Service].to[ServiceImpl]
 
 }
 
-val assembler = Assembler[App](new AppBlueprint)
+val assembler = Assembler[App](new Blueprint)
 
 val app = assembler()
 
-// val blueprint = new AppBlueprint
+// val blueprint = new Blueprint
 // new App(new ServiceImpl(new Repository)))
 
 ```
@@ -116,13 +116,13 @@ trait ServiceBlueprint {
   }
 }
 
-class AppBlueprint extends ServiceBlueprint with RepositoryBlueprint
+class Blueprint extends ServiceBlueprint with RepositoryBlueprint
 
-val assembler = Assembler[App](new AppBlueprint)
+val assembler = Assembler[App](new Blueprint)
 
 val app = assembler()
 
-// val blueprint = new AppBlueprint
+// val blueprint = new Blueprint
 // new App(blueprint.createService(blueprint.createRepository)))
 
 ```
@@ -160,7 +160,7 @@ trait ServiceBlueprint {
   }
 }
 
-class AppBlueprint extends ServiceBlueprint with RepositoryBlueprint
+class Blueprint extends ServiceBlueprint with RepositoryBlueprint
 
 val assembler = Assembler[App](new AppBlueprint)
 
@@ -172,19 +172,19 @@ val app = assembler()
 @blueprint
 class DummyRepository extends Repository
 
-trait TestBlueprint {
+trait TestRepositoryBlueprint {
   
   val dummyRepositoryBinder = bind[Repository].to[DummyRepository]
 }
 
 // this will overwirte reposiry provider from `RepositoryBlueprint`
-class TestAppBlueprint extends AppBlueprint with TestBlueprint
+class TestBlueprint extends Blueprint with TestRepositoryBlueprint
 
-val testAssembler = Assembler[App](new TestAppBlueprint)
+val testAssembler = Assembler[App](new TestBlueprint)
 
 val testApp = testAssembler()
 
-// val blueprint = new TestAppBlueprint
+// val blueprint = new TestBlueprint
 // new App(blueprint.createService(new DummyRepository)))
 ```
 You can also provide multiple implementations for the same types with the `@named` discriminator:
@@ -249,7 +249,7 @@ val app = assembler()
 // new App(new Service(repository)))
 
 ```
-### Dependency graph corectness
+### Dependency graph correctness
 Factorio will validate the corectness of the dependency graph in compile time and will abort compilation on any given error:
 ```scala
 import factorio._
