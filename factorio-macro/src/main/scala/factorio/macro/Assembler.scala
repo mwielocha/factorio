@@ -35,7 +35,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
 
     val assignTree: ArgumentLists => Tree =
       args =>
-        // if the type is marker as replicated we create a def instead of a lazy val
+        // if the type is marked as replicated we create a def instead of a lazy val
         if (props.repl) function(tname, createTree(args))
         else lazyValue(tname, createTree(args))
   }
@@ -59,7 +59,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
 
   private case class AssemblyTree(tname: TermName, tree: Tree, root: Boolean = false)
 
-  def assemble(recipe: c.Expr[B]): Tree = {
+  def assemble(blueprint: c.Expr[B]): Tree = {
 
     val stopWatch = StopWatch()
 
@@ -78,7 +78,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
 
     val output =
       q"""() => {
-          val $blueprintTermName: $blueprintType = $recipe
+          val $blueprintTermName: $blueprintType = $blueprint
          ..$trees
          $root
       }"""

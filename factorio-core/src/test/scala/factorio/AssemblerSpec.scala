@@ -199,11 +199,11 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   it should "not compile when circular dependency exists" in {
     //Assembler[CircularDependency](Blank)
-    assertDoesNotCompile("Assembler[CircularDependency](EmptyBlueprint)")
+    assertDoesNotCompile("Assembler[CircularDependency](Blank)")
   }
 
   it should "not compile when no binding was provided for an interface" in {
     //Assembler[App](Blank)
-    assertDoesNotCompile("Assembler[App](EmptyBlueprint)")
+    assertDoesNotCompile("Assembler[App](Blank)")
   }
 }
