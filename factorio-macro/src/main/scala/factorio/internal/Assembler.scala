@@ -1,11 +1,11 @@
-package factorio.`macro`
+package factorio.internal
 
-import factorio.annotations.{ provides, replicated }
+import factorio.annotations.replicated
 
-import scala.reflect.macros.blackbox
 import scala.collection.mutable
+import scala.reflect.macros.blackbox
 
-class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
+private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
 
   import c.universe._
 
@@ -21,8 +21,8 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
 
   private lazy val blueprintTermName = uname(blueprintType)
 
-  type ArgumentLists = List[List[TermName]]
-  type ParameterLists = List[List[Named[Type]]]
+  private type ArgumentLists = List[List[TermName]]
+  private type ParameterLists = List[List[Named[Type]]]
 
   private abstract class Assembly(
     val `type`: Type,
@@ -36,17 +36,17 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
     val assignTree: ArgumentLists => Tree =
       args =>
         // if the type is marked as replicated we create a def instead of a lazy val
-        if (props.repl) function(tname, createTree(args))
-        else lazyValue(tname, createTree(args))
+        if (props.repl) function(tname, `type`, createTree(args))
+        else lazyValue(tname, `type`, createTree(args))
   }
 
   private object Assembly {
 
     // constructor-based assembly
-    def apply(`type`: Type, props: Props)(parameterLists: ParameterLists): Assembly =
+    def apply(`type`: Type, bindedType: Type, props: Props)(parameterLists: ParameterLists): Assembly =
       new Assembly(`type`, props, parameterLists) {
         override val createTree: ArgumentLists => Tree =
-          args => q"new ${`type`}(...$args)"
+          args => q"new $bindedType(...$args)"
       }
 
     // blueprint provider-based assembly
@@ -213,7 +213,7 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
         // if yes then let's create an assembly
 
         val paramLists = constructor.asMethod.paramLists.namedTypeSignatures
-        val assembly = Assembly(bindedType, newProps)(paramLists)
+        val assembly = Assembly(`type`, bindedType, newProps)(paramLists)
         val newOutput = output + (Named(`type`, newProps.name) -> assembly)
         analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
     }

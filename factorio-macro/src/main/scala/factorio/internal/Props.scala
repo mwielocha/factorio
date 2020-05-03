@@ -1,6 +1,6 @@
-package factorio.`macro`
+package factorio.internal
 
-case class Props(
+private[internal] case class Props(
   name: Option[String] = None,
   repl: Boolean = false,
   root: Boolean = false

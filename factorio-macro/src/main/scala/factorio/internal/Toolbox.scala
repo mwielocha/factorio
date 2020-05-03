@@ -1,10 +1,10 @@
-package factorio.`macro`
+package factorio.internal
 
 import factorio.annotations.named
 
 import scala.reflect.macros.blackbox
 
-trait Toolbox[+C <: blackbox.Context] {
+private[internal] trait Toolbox[+C <: blackbox.Context] {
 
   val c: C
   import c.universe._
@@ -12,7 +12,7 @@ trait Toolbox[+C <: blackbox.Context] {
   def debug(a: Any): Unit =
     c.echo(c.enclosingPosition, s"$a")
 
-  private[`macro`] object Error {
+  private[internal] object Error {
 
     def apply(msg: String, args: Any*)(rootPath: Seq[Type] = Nil): String = {
       val formatted = args.foldLeft(msg) {
@@ -51,21 +51,21 @@ trait Toolbox[+C <: blackbox.Context] {
       s"${Console.YELLOW}$s${Console.RESET}"
   }
 
-  private[`macro`] def discoverConstructor(targetType: Type): Option[Symbol] = {
+  private[internal] def discoverConstructor(targetType: Type): Option[Symbol] = {
     lazy val constructors = targetType.members
       .filter(m => m.isMethod && m.asMethod.isConstructor && m.isPublic)
       .filterNot(_.asMethod.fullName.endsWith("$init$"))
     constructors.find(_.asMethod.isPrimaryConstructor)
   }
 
-  private[`macro`] def uname(targetType: Type, name: Option[String] = None): TermName = {
+  private[internal] def uname(targetType: Type, name: Option[String] = None): TermName = {
     import c.universe._
     val baseClassName = targetType.baseClasses.head.name.toString
     val output = c.freshName((Seq(firstCharLowerCase(baseClassName)) ++ name).mkString("@"))
     TermName(output)
   }
 
-  private[`macro`] implicit class SymbolExtension(s: Symbol) {
+  private[internal] implicit class SymbolExtension(s: Symbol) {
 
     def isAnnotatedWith(annotations: Type*): Boolean =
       s.annotations.exists(t => annotations.contains(t.tree.tpe))
@@ -88,7 +88,7 @@ trait Toolbox[+C <: blackbox.Context] {
     }
   }
 
-  private[`macro`] implicit class SymbolListsExtension(symbolLists: List[List[Symbol]]) {
+  private[internal] implicit class SymbolListsExtension(symbolLists: List[List[Symbol]]) {
 
     def namedTypeSignatures: List[List[Named[Type]]] =
       symbolLists.map {
@@ -100,10 +100,10 @@ trait Toolbox[+C <: blackbox.Context] {
       }
   }
 
-  private[`macro`] def function(tname: TermName, of: Tree) = q"def $tname = $of"
-  private[`macro`] def lazyValue(tname: TermName, of: Tree) = q"lazy val $tname = $of"
+  private[internal] def function(tname: TermName, resultType: Type, of: Tree) = q"def $tname: $resultType = $of"
+  private[internal] def lazyValue(tname: TermName, resultType: Type, of: Tree) = q"lazy val $tname: $resultType = $of"
 
-  private[`macro`] def firstCharLowerCase(s: String): String =
+  private[internal] def firstCharLowerCase(s: String): String =
     if (s.nonEmpty) s"${Character.toLowerCase(s.charAt(0))}${s.substring(1)}"
     else s
 

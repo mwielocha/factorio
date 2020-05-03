@@ -6,9 +6,9 @@ import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import System.nanoTime
 
-package object `macro` {
+package object internal {
 
-  object StopWatch {
+  private[internal] object StopWatch {
 
     def apply(): () => Duration = {
       val start = nanoTime()
