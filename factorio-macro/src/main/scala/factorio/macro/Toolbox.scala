@@ -100,8 +100,8 @@ trait Toolbox[+C <: blackbox.Context] {
       }
   }
 
-  def function(tname: TermName, of: Tree) = q"def $tname = $of"
-  def lazyValue(tname: TermName, of: Tree) = q"lazy val $tname = $of"
+  private[`macro`] def function(tname: TermName, of: Tree) = q"def $tname = $of"
+  private[`macro`] def lazyValue(tname: TermName, of: Tree) = q"lazy val $tname = $of"
 
   private[`macro`] def firstCharLowerCase(s: String): String =
     if (s.nonEmpty) s"${Character.toLowerCase(s.charAt(0))}${s.substring(1)}"
