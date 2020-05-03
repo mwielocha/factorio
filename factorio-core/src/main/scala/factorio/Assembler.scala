@@ -1,6 +1,6 @@
 package factorio
 
-import factorio.`macro`.AssemblerMacro
+import factorio.internal.AssemblerMacro
 
 import scala.language.experimental.macros
 

@@ -1,6 +1,6 @@
-package factorio.`macro`
+package factorio.internal
 
-case class Named[T](value: T, name: Option[String]) {
+private[internal] case class Named[T](value: T, name: Option[String]) {
 
   override def toString: String = {
     name match {

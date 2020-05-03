@@ -1,4 +1,4 @@
-package factorio.`macro`
+package factorio.internal
 
 import factorio.annotations.{ blueprint, provides, replicated }
 
@@ -8,29 +8,29 @@ import scala.collection.mutable
 class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
   import c.universe._
 
-  val blueprintBaseType = weakTypeTag[R].tpe
+  private[internal] val blueprintBaseType = weakTypeTag[R].tpe
 
-  lazy val blueprintBaseClassSymbols: List[Symbol] =
+  private[internal] lazy val blueprintBaseClassSymbols: List[Symbol] =
     blueprintBaseType.baseClasses.filter(_.isAnnotatedWith(typeOf[blueprint]))
 
-  case class Binder(`type`: Type, props: Props)
-  case class Provider(symbol: Symbol, props: Props)
+  private[internal] case class Binder(`type`: Type, props: Props)
+  private[internal] case class Provider(symbol: Symbol, props: Props)
 
-  case class Blueprint(
+  private[internal] case class Blueprint(
     binders: Map[Named[Type], Binder],
     providers: Map[Named[Type], Provider]
   )
 
-  def isBinder(m: Symbol): Boolean =
+  private[internal] def isBinder(m: Symbol): Boolean =
     typeOf[factorio.Binder[_, _]].erasure ==
       m.typeSignature.resultType.dealias.erasure
 
-  def isProvider(member: Symbol): Boolean =
+  private[internal] def isProvider(member: Symbol): Boolean =
     member.isMethod &&
       member.isPublic &&
       member.isAnnotatedWith(typeOf[provides])
 
-  def blueprintAnalysis: Blueprint = {
+  private[internal] def blueprintAnalysis: Blueprint = {
 
     val binders = mutable.Map.empty[Named[Type], Binder]
     val providers = mutable.Map.empty[Named[Type], Provider]
