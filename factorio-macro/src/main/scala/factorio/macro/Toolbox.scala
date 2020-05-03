@@ -9,10 +9,8 @@ trait Toolbox[+C <: blackbox.Context] {
   val c: C
   import c.universe._
 
-  def debug(a: Any) = {
-    //println(a)
-    ()
-  }
+  def debug(a: Any): Unit =
+    c.echo(c.enclosingPosition, s"$a")
 
   private[`macro`] object Error {
 

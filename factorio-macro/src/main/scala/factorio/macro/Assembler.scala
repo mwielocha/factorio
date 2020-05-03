@@ -105,7 +105,6 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
   }
 
   private def assembleTrees: Set[AssemblyTree] = {
-    import c.universe._
 
     val trees = mutable.HashSet.empty[AssemblyTree]
 
@@ -115,9 +114,6 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
       Seq.empty,
       Map.empty
     )
-
-    debug("*** final output")
-    assemblies.foreach(debug)
 
     // values holds all types that we need to assemble
     for {
@@ -150,9 +146,6 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](ove
     rootPath: Seq[Type] = Seq.empty, //path from root
     output: Map[Named[Type], Assembly] = Map.empty // output
   ): Map[Named[Type], Assembly] = {
-
-    debug("*** analyzeType:")
-    output.foreach(debug)
 
     val Blueprint(binders, providers) = blueprintAnalysis
 

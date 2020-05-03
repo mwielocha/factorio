@@ -15,7 +15,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   "Assembly macro" should "assemble a component" in {
 
-    val assembler = assemble[Repository](Blank)
+    val assembler = Assembler[Repository](Blank)
 
     assembler()
     succeed
@@ -23,7 +23,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   it should "assemble a simple app" in {
 
-    val assembler = assemble[App](new ServiceBlueprint {})
+    val assembler = Assembler[App](new ServiceBlueprint {})
 
     val app = assembler()
     app.service.repository shouldBe app.otherService.repository
@@ -41,7 +41,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
         database
     }
 
-    val assembler = assemble[App](new AppBlueprint)
+    val assembler = Assembler[App](new AppBlueprint)
 
     val app = assembler()
 
@@ -63,7 +63,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
         new App(service, otherService)
     }
 
-    val assembler = assemble[App](new AppBlueprint)
+    val assembler = Assembler[App](new AppBlueprint)
 
     val app = assembler()
 
@@ -90,7 +90,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
         otherDatabase
     }
 
-    val assembler = assemble[MultiDatabaseRepository](new MultiDatabaseRepositoryBlueprint)
+    val assembler = Assembler[MultiDatabaseRepository](new MultiDatabaseRepositoryBlueprint)
 
     val repository = assembler()
 
@@ -114,7 +114,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
       val otherClientBinder = bind[Client].to[OtherClientImpl]
     }
 
-    val assembler = assemble[Clients](new ServicesBlueprint)
+    val assembler = Assembler[Clients](new ServicesBlueprint)
 
     val clients = assembler()
 
@@ -130,7 +130,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
       val bindRepository = bind[Repository].to[ReplicatedRepository]
     }
 
-    val assembler = assemble[App](new ReplicatedServiceBlueprint)
+    val assembler = Assembler[App](new ReplicatedServiceBlueprint)
 
     val app = assembler()
 
@@ -149,7 +149,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
         new Repository(database)
     }
 
-    val assembler = assemble[App](new ReplicatedRepositoryBlueprint)
+    val assembler = Assembler[App](new ReplicatedRepositoryBlueprint)
 
     val app = assembler()
 
@@ -168,7 +168,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
         new Database
     }
 
-    val assembler = assemble[App](new AppBlueprint)
+    val assembler = Assembler[App](new AppBlueprint)
 
     val app = assembler()
 
@@ -176,12 +176,12 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "not compile when circular dependency exists" in {
-    //assemble[CircularDependency](Blank)
-    assertDoesNotCompile("assemble[CircularDependency](EmptyBlueprint)")
+    //Assembler[CircularDependency](Blank)
+    assertDoesNotCompile("Assembler[CircularDependency](EmptyBlueprint)")
   }
 
   it should "not compile when no binding was provided for an interface" in {
-    //assemble[App](Blank)
-    assertDoesNotCompile("assemble[App](EmptyBlueprint)")
+    //Assembler[App](Blank)
+    assertDoesNotCompile("Assembler[App](EmptyBlueprint)")
   }
 }

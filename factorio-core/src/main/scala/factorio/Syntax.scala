@@ -12,7 +12,8 @@ trait Syntax {
 
   object Blank
 
-  def assemble[T]: Assembler[T] = new Assembler[T]
+  @deprecated("Use Assembler[T] instead.", "0.0.2")
+  def assemble[T]: Assembler[T] = Assembler[T]
 
   implicit def intellijHack[T, R](in: Assembler[T]): R => () => T = ???
 }
