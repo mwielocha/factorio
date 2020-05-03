@@ -193,8 +193,8 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     val instance: Package = assembler()
     val otherInstance: Package = otherAssembler()
 
-    instance.member.getClass shouldBe classOf[OtherMemberImpl]
-    otherInstance.member.getClass shouldBe classOf[MemberImpl]
+    instance.member.getClass shouldBe classOf[MemberImpl]
+    otherInstance.member.getClass shouldBe classOf[OtherMemberImpl]
   }
 
   it should "not compile when circular dependency exists" in {

@@ -17,7 +17,7 @@ class Service(val repository: Repository)
 
 class App(service: Service)
 
-val assembler = assemble[App](EmptyRecipe)
+val assembler = Assembler[App](Blank)
 
 val app = assembler()
 
@@ -25,10 +25,11 @@ val app = assembler()
 
 ```
 
-### Recipies
+### Blueprints
 
-You can configure coupling with a recipe. Recipe is a class that extends `factorio.Recipe` and contains a set or rules on how to construct given components.
-There are two ways of provind coupling rules:
+You can configure couplings with a blueprint. 
+A blueprint is in short a single class, or a chain of mixed traits 
+marked by `@blueprint` annotation that holds provider methods or concrete type bindings:
 
 ```scala
 
@@ -39,7 +40,8 @@ class Service(val repository: Repository)
 
 class App(service: Service)
 
-class AppRecipe extends Recipe {
+@blueprint
+class AppBlueprint {
   
   @provides
   def createService(repository: Repository): Service = {
@@ -47,7 +49,7 @@ class AppRecipe extends Recipe {
   }
 }
 
-val assembler = assemble[App](new AppRecipe)
+val assembler = Assembler[App](new AppRecipe)
 
 val app = assembler()
 
@@ -55,6 +57,7 @@ val app = assembler()
 // new App(recipe.createService(new Repository)))
 
 ```
+
 You can also simply `bind` implementations to super classes or interfaces:
 ```scala
 
@@ -66,21 +69,125 @@ class ServiceImpl(val repository: Repository) extends Service
 
 class App(service: Service)
 
-class AppRecipe extends Recipe {
+@blueprint
+class AppBlueprint {
   
   val serviceBinder = bind[Service].to[ServiceImpl]
 
 }
 
-val assembler = assemble[App](new AppRecipe)
+val assembler = Assembler[App](new AppBlueprint)
 
 val app = assembler()
 
-// val recipe = new AppRecipe
+// val blueprint = new AppBlueprint
 // new App(new ServiceImpl(new Repository)))
 
 ```
-You can also provide multiple implementations with the `@named` discriminator:
+
+Blueprints can be composed of various traits but only traits 
+that are marked with `@blueprint` will be searched for binders and providers:
+
+```scala
+
+import factorio._
+
+class Database
+class Repository(val database: Database)
+class Service(val repository: Repository)
+
+class App(service: Service)
+
+@blueprint
+trait RepositoryBlueprint {
+
+  @provides
+    def createRepository: Repository = {
+      new Repository(new Database)
+    }
+}
+
+@blueprint
+trait ServiceBlueprint {
+  
+  @provides
+  def createService(repository: Repository): Service = {
+    new Service(repository)
+  }
+}
+
+class AppBlueprint extends ServiceBlueprint with RepositoryBlueprint
+
+val assembler = Assembler[App](new AppBlueprint)
+
+val app = assembler()
+
+// val blueprint = new AppBlueprint
+// new App(blueprint.createService(blueprint.createRepository)))
+
+```
+
+Blueprint traits will be searched in order of natural scala mixin folding. This means that earlier traits in mixin chain
+will override binding of later ones if they define bindings for the same type. This is usefull if you want to rewrite bindings,
+for example, for test scope, but you don't want to decompose the original blueprint chain:
+
+```scala
+
+import factorio._
+
+class Database
+trait Repository
+class RepositoryImpl(val database: Database) extends Repository
+class Service(val repository: Repository)
+
+class App(service: Service)
+
+@blueprint
+trait RepositoryBlueprint {
+
+  @provides
+    def createRepository: Repository = {
+      new RepositoryImpl(new Database)
+    }
+}
+
+@blueprint
+trait ServiceBlueprint {
+  
+  @provides
+  def createService(repository: Repository): Service = {
+    new Service(repository)
+  }
+}
+
+class AppBlueprint extends ServiceBlueprint with RepositoryBlueprint
+
+val assembler = Assembler[App](new AppBlueprint)
+
+val app = assembler()
+
+// val blueprint = new AppBlueprint
+// new App(blueprint.createService(blueprint.createRepository)))
+
+@blueprint
+class DummyRepository extends Repository
+
+trait TestBlueprint {
+  
+  val dummyRepositoryBinder = bind[Repository].to[DummyRepository]
+}
+
+// this will overwirte reposiry provider from `RepositoryBlueprint`
+class TestAppBlueprint extends AppBlueprint with TestBlueprint
+
+val testAssembler = Assembler[App](new TestAppBlueprint)
+
+val testApp = testAssembler()
+
+// val blueprint = new TestAppBlueprint
+// new App(blueprint.createService(new DummyRepository)))
+```
+You can also provide multiple implementations for the same types with the `@named` discriminator:
  ```scala
  
  import factorio._
@@ -95,7 +202,8 @@ You can also provide multiple implementations with the `@named` discriminator:
   @named("other") otherService: Service
 )
  
- class AppRecipe extends Recipe {
+ @blueprint
+ class AppBlueprint {
    
    @named("that")
    def thatService(repository: Repository) =
@@ -107,15 +215,15 @@ You can also provide multiple implementations with the `@named` discriminator:
 
  }
  
- val assembler = assemble[App](new AppRecipe)
+ val assembler = Assembler[App](new AppBlueprint)
  
  val app = assembler()
  
- // val recipe = new AppRecipe
+ // val blueprint = new AppBlueprint
  // val repository = new Repository
  // new App(
- //   recipe.thatService(repository), 
- //   recipe.otherService(repository))
+ //   blueprint.thatService(repository), 
+ //   blueprint.otherService(repository))
  // )
  
  ```
@@ -132,7 +240,7 @@ class Service(val repository: Repository)
 
 class App(service: Service)
 
-val assembler = assemble[App](EmptyRecipe)
+val assembler = Assembler[App](Blank)
 
 val app = assembler()
 
@@ -141,34 +249,6 @@ val app = assembler()
 // new App(new Service(repository)))
 
 ```
-Annotations can be composed with other annotations or binders in order to combine effects:
-```scala
-
-import factorio._
-
-class Repository
-trait Service
-class ServiceImpl(val repository: Repository) extends Service
-
-class App(service: Service)
-
-class AppRecipe extends Recipe {
-  
-  @replicated
-  val serviceBinder = bind[Service].to[ServiceImpl]
-
-}
-
-val assembler = assemble[App](new AppRecipe)
-
-val app = assembler()
-
-// val recipe = new AppRecipe
-// def service = new ServiceImpl(new Repository)
-// new App(service)
-
-```
-
 ### Dependency graph corectness
 Factorio will validate the corectness of the dependency graph in compile time and will abort compilation on any given error:
 ```scala
@@ -178,11 +258,11 @@ class CircularDependency(val dependency: OuterCircularDependency)
 
 class OuterCircularDependency(val dependency: CircularDependency)
 
-val assembler = assemble[CircularDependency](EmptyRecipe)
+Assembler[CircularDependency](Blank)
 
 //[error] [Factorio]: Circular dependency detected: factorio.CircularDependency -> factorio.OuterCircularDependency -> factorio.CircularDependency
 //[error]
-//[error]     assemble[CircularDependency](EmptyRecipe)
+//[error]     Assembler[CircularDependency](EmptyRecipe)
 //[error]                                 ^
 //[error] one error found
 
@@ -198,11 +278,11 @@ class ServiceImpl(val repository: Repository) extends Service
 
 class App(service: Service)
 
-assemble[App](EmptyRecipe)
+Assembler[App](Blank)
 
 //[error] [Factorio]: Cannot construct an instance of [factorio.Service]
 //[error]
-//[error]     assemble[App](EmptyRecipe)
+//[error]     Assembler[App](EmptyRecipe)
 //[error]                  ^
 //[error] one error found
 ```
