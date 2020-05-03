@@ -3,37 +3,67 @@ package factorio.`macro`
 import factorio.annotations.{ provides, replicated }
 
 import scala.reflect.macros.blackbox
+import scala.collection.mutable
 
-class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
+class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
 
   import c.universe._
 
-  private case class Named(tpe: Type, name: Option[String])
-  private case class Assembly(tpe: Type, tname: TermName, const: Symbol, props: Props)
+  private final val bluerprintAnalyzer =
+    new BluerprintAnalyzer[c.type, B](c)(weakTypeTag[B])
+
+  import bluerprintAnalyzer._
+
+  private lazy val rootType = weakTypeTag[T].tpe.dealias
+  private lazy val blueprintType = weakTypeTag[B].tpe.dealias
+
+  private lazy val blueprintAnalysis = bluerprintAnalyzer.blueprintAnalysis
+
+  private lazy val blueprintTermName = uname(blueprintType)
+
+  type ArgumentLists = List[List[TermName]]
+  type ParameterLists = List[List[Named[Type]]]
+
+  private abstract class Assembly(
+    val `type`: Type,
+    val props: Props,
+    val parameterLists: ParameterLists
+  ) {
+
+    val tname = uname(`type`, props.name)
+    def createTree: ArgumentLists => Tree
+
+    val assignTree: ArgumentLists => Tree =
+      args =>
+        // if the type is marked as replicated we create a def instead of a lazy val
+        if (props.repl) function(tname, createTree(args))
+        else lazyValue(tname, createTree(args))
+  }
+
+  private object Assembly {
+
+    // constructor-based assembly
+    def apply(`type`: Type, props: Props)(parameterLists: ParameterLists): Assembly =
+      new Assembly(`type`, props, parameterLists) {
+        override val createTree: ArgumentLists => Tree =
+          args => q"new ${`type`}(...$args)"
+      }
+
+    // blueprint provider-based assembly
+    def apply(`type`: Type, symbol: Symbol, props: Props)(parameterLists: ParameterLists): Assembly =
+      new Assembly(`type`, props, parameterLists) {
+        override val createTree: ArgumentLists => Tree =
+          args => q"$blueprintTermName.$symbol(...$args)"
+      }
+  }
+
   private case class AssemblyTree(tname: TermName, tree: Tree, root: Boolean = false)
 
-  private case class Props(
-    name: Option[String] = None,
-    replicated: Boolean = false,
-    root: Boolean = false
-  )
+  def assemble(blueprint: c.Expr[B]): Tree = {
 
-  private case class Binder(targetType: Type, props: Props)
-  private case class Provider(symbol: Symbol, props: Props)
+    val stopWatch = StopWatch()
 
-  private type Binders = Map[Named, Binder]
-  private type Providers = Map[Named, Provider]
-
-  def assemble(recipe: c.Expr[R]): Tree = {
-
-    val targetType = weakTypeTag[T].tpe.dealias
-    val recipeTargetType = weakTypeTag[R].tpe.dealias
-    val recipeTermName = uname(recipeTargetType)
-
-    val binders = binderLookup(recipeTargetType)
-    val providers = providerLookup(recipeTargetType)
-
-    val assemblies = assemblyTrees(targetType, recipeTermName, binders, providers)
+    val assemblies = assembleTrees
     val trees = assemblies.map(_.tree)
 
     val root = assemblies
@@ -42,13 +72,13 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
       .getOrElse {
         c.abort(
           c.enclosingPosition,
-          Error("Couldn't find application root.")
+          Error("Don't know how to construct an instance of [{}]", rootType)(Nil)
         )
       }
 
     val output =
       q"""() => {
-          val $recipeTermName: $recipeTargetType = $recipe
+          val $blueprintTermName: $blueprintType = $blueprint
          ..$trees
          $root
       }"""
@@ -57,204 +87,149 @@ class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, R : C#WeakTypeTag](ove
       .toString().split("\n")
       .mkString(Console.GREEN, s"\n${Console.GREEN}", Console.RESET)
 
+    val elapsed = stopWatch()
+
     c.info(
       c.enclosingPosition,
-      s"\n[Factorio]:" +
-        s"\nGenerated output:\n${verbose}",
+      s"\n${Console.YELLOW}[Factorio]:" +
+        s"\n${Console.YELLOW}Done in $elapsed.\n${verbose}",
       force = false
     )
 
     output
   }
 
-  private def assemblyTrees(
-    targetType: Type,
-    rname: TermName,
-    bind: Binders,
-    prov: Providers
-  ): Seq[AssemblyTree] = {
-    import c.universe._
+  private def assembleTrees: Set[AssemblyTree] = {
 
-    val trees = Seq.empty[AssemblyTree]
+    val trees = mutable.HashSet.empty[AssemblyTree]
 
-    val graph = constructDependencyGraph(bind, prov)(
-      targetType,
+    val assemblies = analyzeType(
+      rootType,
       Props(root = true),
       Seq.empty,
-      Seq.empty
-    ).reverse
-
-    graph.foldLeft(trees) {
-      case (trees, Assembly(targetType, fname, const, props)) =>
-        trees :+ {
-          val args = const.asMethod.paramLists.map {
-            _.flatMap { param =>
-              val named = param.named
-              val parameterType = param.typeSignature.dealias
-
-              graph.find {
-                case Assembly(targetType, _, _, props) =>
-                  targetType == parameterType && named == props.name
-              } match {
-                case Some(Assembly(_, name, _, _)) =>
-                  Some(q"""$name""")
-                case None => None
-              }
-            }
-          }
-
-          val named = Named(targetType, props.name)
-
-          val isConstructor = const.asMethod.isConstructor
-
-          val Binder(typeOrBindedType, propsOrBindedProps) =
-            bind.getOrElse(named, Binder(targetType, props))
-
-          val assemblyTree =
-            if (isConstructor) q"""new $typeOrBindedType(...$args)"""
-            else q"""$rname.$const(...$args)"""
-
-          val replicated = props.replicated || propsOrBindedProps.replicated ||
-            prov.view.mapValues(_.props.replicated).getOrElse(named, false)
-
-          AssemblyTree(
-            fname,
-            if (replicated) {
-              q"""def $fname: $targetType = $assemblyTree"""
-            } else q"""lazy val $fname: $targetType = $assemblyTree""",
-            propsOrBindedProps.root
-          )
-        }
-    }
-  }
-
-  private def constructDependencyGraph(
-    binders: Binders = Map.empty,
-    providers: Providers = Map.empty
-  )(
-    targetType: Type, // type
-    props: Props,
-    path: Seq[Type] = Seq.empty, //path from root
-    output: Seq[Assembly] = Seq.empty // output
-  ): Seq[Assembly] = {
-
-    val isBinded = binders.contains(Named(targetType, props.name))
-
-    val Binder(typeOrBindedType, propsOrBindedProps) =
-      binders.getOrElse(Named(targetType, props.name), Binder(targetType, props))
-
-    val propsWithReplicated = propsOrBindedProps.copy(
-      replicated = props.replicated || typeOrBindedType.typeSymbol
-        .isAnnotatedWith(typeOf[replicated])
+      Map.empty
     )
 
-    if (path.contains(typeOrBindedType))
-      c.abort(c.enclosingPosition, Error(s"Circular dependency detected: ${(path :+ typeOrBindedType).mkString(" -> ")}"))
-
-    val alreadyVisited = output.view
-      .map {
-        case Assembly(visitedType, _, _, Props(name, _, _)) =>
-          visitedType -> name
-      }.to(Set)
-
-    if (!alreadyVisited(typeOrBindedType -> props.name)) {
-
-      val const = props.name match {
-
-        case nameOrNone @ Some(name) if !isBinded =>
-          providers.view
-            .mapValues(_.symbol).getOrElse(
-              Named(typeOrBindedType, nameOrNone),
+    // values holds all types that we need to assemble
+    for {
+      assembly <- assemblies.values
+      arguments = assembly.parameterLists.map {
+        _.map { named =>
+          assemblies
+            .getOrElse(
+              named,
               c.abort(
                 c.enclosingPosition,
                 Error(
-                  s"Proivider not found for an instance of " +
-                    s"[${Console.YELLOW}$typeOrBindedType${Console.RED}] " +
-                    s"discriminated with [${Console.YELLOW}$name${Console.RED}]"
-                )
+                  s"Couldn't create an instance of [{}] " +
+                    s"when constructing [{}]",
+                  named,
+                  assembly.`type`
+                )(Nil)
               )
-            )
-
-        case _ =>
-          providers.view
-            .mapValues(_.symbol).getOrElse(
-              Named(typeOrBindedType, propsWithReplicated.name),
-              discoverConstructor(typeOrBindedType)
-                .getOrElse {
-                  c.abort(
-                    c.enclosingPosition,
-                    Error(
-                      s"Cannot construct an instance of " +
-                        s"[${Console.YELLOW}$typeOrBindedType${Console.RED}]"
-                    )
-                  )
-                }
-            )
-
+            ).tname
+        }
       }
+      tree = AssemblyTree(
+        assembly.tname,
+        assembly.assignTree(arguments),
+        root = assembly.props.root
+      )
+    } yield trees add tree
 
-      val targetTermName = uname(typeOrBindedType, propsWithReplicated.name)
-      val newOut = output :+ Assembly(targetType, targetTermName, const, propsWithReplicated)
-
-      const.asMethod.paramLists.foldLeft(newOut) {
-        case (out, list) =>
-          list.foldLeft(out) {
-            case (out, parameter) =>
-              val parameterType = parameter.typeSignature.dealias
-              val name = parameter.named
-
-              val props = Props(name)
-              constructDependencyGraph(binders, providers)(parameterType, props, path :+ typeOrBindedType, out)
-          }
-
-      }
-    } else output
+    trees.to(Set)
   }
 
-  private def providerLookup(recipeType: Type): Providers = {
+  private def analyzeType(
+    `type`: Type, // type
+    props: Props,
+    rootPath: Seq[Type] = Seq.empty, //path from root
+    output: Map[Named[Type], Assembly] = Map.empty // output
+  ): Map[Named[Type], Assembly] = {
 
-    val providers = Map.empty[Named, Provider]
+    val Blueprint(binders, providers) = blueprintAnalysis
 
-    recipeType.baseClasses.foldLeft(providers) {
-      case (acc, baseClassSymbol) =>
-        baseClassSymbol.typeSignature.members.foldLeft(acc) {
-          case (acc, member) =>
-            if (member.isMethod && member.isPublic && member.isAnnotatedWith(typeOf[provides])) {
-              val targetType = member.typeSignature.resultType.dealias
+    // first, check if this is a binded type
+    val bindedType = binders.view
+      .mapValues(_.`type`)
+      .getOrElse(Named(`type`, props.name), `type`)
 
-              val name = member.named
-              val replicated = member.isAnnotatedWith(typeOf[replicated])
-              val provider = Provider(member, Props(name, replicated))
+    // let's also check what annotations does this type has
+    val newProps = props.copy(
+      repl = bindedType.typeSymbol
+        .isAnnotatedWith(typeOf[replicated])
+    )
 
-              acc + (Named(targetType, name) -> provider)
-            } else acc
+    // second, check if we've already seen this type
+    if (rootPath.contains(bindedType)) {
+      c.abort(
+        c.enclosingPosition,
+        Error(s"Circular dependency detected: {}", (rootPath :+ bindedType).mkString(" -> "))(rootPath)
+      )
+    }
+
+    // ok, we have a type, now let's see if there is a provide for it
+    val bindedIndentifier = Named(bindedType, newProps.name)
+    val providerOrNone = providers.get(bindedIndentifier)
+
+    providerOrNone match {
+
+      case Some(Provider(symbol, props)) =>
+        // we have a provide, let's create an assembly
+
+        val paramLists = symbol.asMethod.paramLists.namedTypeSignatures
+        val assembly = Assembly(`type`, symbol, newProps || props)(paramLists)
+        val newOutput = output + (bindedIndentifier -> assembly)
+
+        analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
+
+      case None =>
+        // no provider means we'll be calling a constructor but can we instantinate this type?
+
+        if (bindedType.typeSymbol.isAbstract) {
+          c.abort(
+            c.enclosingPosition,
+            Error(
+              s"Cannot counstruct an instance of an abstract class " +
+                s"[{}], provide a concrete class binder or an instance provider.",
+              bindedType
+            )(rootPath)
+          )
         }
+
+        // can we find a contructor then?
+
+        val constructor = discoverConstructor(bindedType).getOrElse(
+          c.abort(
+            c.enclosingPosition,
+            Error(
+              s"Cannot find a public constructor for " +
+                s"[{}], provide a concrete class binder or an instance provider.",
+              bindedType
+            )(rootPath)
+          )
+        )
+
+        // if yes then let's create an assembly
+
+        val paramLists = constructor.asMethod.paramLists.namedTypeSignatures
+        val assembly = Assembly(bindedType, newProps)(paramLists)
+        val newOutput = output + (Named(`type`, newProps.name) -> assembly)
+        analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
     }
   }
 
-  private def binderLookup(recipeType: Type): Binders = {
-    import c.universe._
+  private def analyzeParameterLists(
+    parameterLists: ParameterLists,
+    rootPath: Seq[Type],
+    output: Map[Named[Type], Assembly]
+  ): Map[Named[Type], Assembly] = {
 
-    val binders = Map.empty[Named, Binder]
-
-    def isBinder(m: Symbol): Boolean =
-      m.typeSignature.resultType.erasure == typeOf[factorio.Binder[_, _]].erasure
-
-    recipeType.baseClasses.foldLeft(binders) {
-      case (acc, baseClassSymbol) =>
-        baseClassSymbol.typeSignature.members.foldLeft(acc) {
-          case (acc, member) =>
-            if (member.isTerm && isBinder(member)) {
-              val targetType :: bindedType :: Nil = member.typeSignature.resultType.typeArgs
-                .map(_.dealias)
-
-              val name = member.named
-
-              val replicated = member.isAnnotatedWith(typeOf[replicated])
-              val binder = Binder(bindedType, Props(name, replicated))
-
-              acc + (Named(targetType, name) -> binder)
-            } else acc
+    parameterLists.foldLeft(output) {
+      case (output, list) =>
+        list.foldLeft(output) {
+          case (output, Named(parameterType, name)) =>
+            analyzeType(parameterType, Props(name), rootPath, output)
         }
     }
   }

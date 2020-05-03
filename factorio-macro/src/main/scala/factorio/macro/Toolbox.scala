@@ -4,15 +4,51 @@ import factorio.annotations.named
 
 import scala.reflect.macros.blackbox
 
-trait Toolbox[C <: blackbox.Context] {
+trait Toolbox[+C <: blackbox.Context] {
 
   val c: C
   import c.universe._
 
+  def debug(a: Any): Unit =
+    c.echo(c.enclosingPosition, s"$a")
+
   private[`macro`] object Error {
 
-    def apply(msg: String): String =
-      s"\n${Console.YELLOW}[Factorio]: ${Console.RED}$msg${Console.RESET}\n\n"
+    def apply(msg: String, args: Any*)(rootPath: Seq[Type] = Nil): String = {
+      val formatted = args.foldLeft(msg) {
+        case (msg, arg) =>
+          msg.replaceFirst("\\{}", s"${Console.YELLOW}$arg${Console.RED}")
+      }
+
+      val context = rootPath match {
+        case Nil => ""
+        case rootPath =>
+          val header = new StringBuilder(s"\n")
+          header.append(s"${Console.RED}While analyzing path:\n")
+          rootPath.zipWithIndex
+            .foldLeft(header) {
+              case (acc, (node, index)) =>
+                acc.append(Console.RED)
+                Seq
+                  .fill(index)(" ")
+                  .foreach(acc.append)
+                acc
+                  .append(index)
+                  .append(": ")
+                  .append(node)
+                  .append(" ->")
+                  .append("\n")
+            }.append("\n")
+      }
+
+      s"\n${Console.RED} [Factorio]: $formatted\n$context"
+    }
+
+    def error(s: Any) =
+      s"${Console.RED}$s${Console.RESET}"
+
+    def warning(s: Any) =
+      s"${Console.YELLOW}$s${Console.RESET}"
   }
 
   private[`macro`] def discoverConstructor(targetType: Type): Option[Symbol] = {
@@ -31,8 +67,8 @@ trait Toolbox[C <: blackbox.Context] {
 
   private[`macro`] implicit class SymbolExtension(s: Symbol) {
 
-    def isAnnotatedWith(a: Type): Boolean =
-      s.annotations.exists(_.tree.tpe == a)
+    def isAnnotatedWith(annotations: Type*): Boolean =
+      s.annotations.exists(t => annotations.contains(t.tree.tpe))
 
     def named: Option[String] = {
       val scala = s.annotations
@@ -52,6 +88,23 @@ trait Toolbox[C <: blackbox.Context] {
     }
   }
 
+  private[`macro`] implicit class SymbolListsExtension(symbolLists: List[List[Symbol]]) {
+
+    def namedTypeSignatures: List[List[Named[Type]]] =
+      symbolLists.map {
+        for {
+          symbol <- _
+          name = symbol.named
+          symbolType = symbol.typeSignature.dealias
+        } yield Named(symbolType, name)
+      }
+  }
+
+  private[`macro`] def function(tname: TermName, of: Tree) = q"def $tname = $of"
+  private[`macro`] def lazyValue(tname: TermName, of: Tree) = q"lazy val $tname = $of"
+
   private[`macro`] def firstCharLowerCase(s: String): String =
-    if (s.nonEmpty) s"${Character.toLowerCase(s.charAt(0))}${s.substring(1)}" else s
+    if (s.nonEmpty) s"${Character.toLowerCase(s.charAt(0))}${s.substring(1)}"
+    else s
+
 }
