@@ -102,9 +102,9 @@ class App(service: Service)
 trait RepositoryBlueprint {
 
   @provides
-    def createRepository: Repository = {
-      new Repository(new Database)
-    }
+  def createRepository: Repository = {
+    new Repository(new Database)
+  }
 }
 
 @blueprint
@@ -146,9 +146,9 @@ class App(service: Service)
 trait RepositoryBlueprint {
 
   @provides
-    def createRepository: Repository = {
-      new RepositoryImpl(new Database)
-    }
+  def createRepository: Repository = {
+    new RepositoryImpl(new Database)
+  }
 }
 
 @blueprint
@@ -169,9 +169,10 @@ val app = assembler()
 // val blueprint = new AppBlueprint
 // new App(blueprint.createService(blueprint.createRepository)))
 
-@blueprint
+
 class DummyRepository extends Repository
 
+@blueprint
 trait TestRepositoryBlueprint {
   
   val dummyRepositoryBinder = bind[Repository].to[DummyRepository]
@@ -262,7 +263,7 @@ Assembler[CircularDependency](Blank)
 
 //[error] [Factorio]: Circular dependency detected: factorio.CircularDependency -> factorio.OuterCircularDependency -> factorio.CircularDependency
 //[error]
-//[error]     Assembler[CircularDependency](EmptyRecipe)
+//[error]     Assembler[CircularDependency](Blank)
 //[error]                                 ^
 //[error] one error found
 
@@ -282,7 +283,7 @@ Assembler[App](Blank)
 
 //[error] [Factorio]: Cannot construct an instance of [factorio.Service]
 //[error]
-//[error]     Assembler[App](EmptyRecipe)
+//[error]     Assembler[App](Blank)
 //[error]                  ^
 //[error] one error found
 ```
