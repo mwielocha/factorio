@@ -12,19 +12,19 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
   def debug(a: Any): Unit =
     c.echo(c.enclosingPosition, s"$a")
 
-  private[internal] object Error {
+  private[internal] object Log {
 
     def apply(msg: String, args: Any*)(rootPath: Seq[Type] = Nil): String = {
       val formatted = args.foldLeft(msg) {
         case (msg, arg) =>
-          msg.replaceFirst("\\{}", s"${Console.YELLOW}$arg${Console.RED}")
+          msg.replaceFirst("\\{}", s"$arg".yellow)
       }
 
       val context = rootPath match {
         case Nil => ""
         case rootPath =>
           val header = new StringBuilder(s"\n")
-          header.append(s"${Console.RED}While analyzing path:\n")
+          header.append(s"While analyzing path:\n")
           rootPath.zipWithIndex
             .foldLeft(header) {
               case (acc, (node, index)) =>
@@ -41,14 +41,9 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
             }.append("\n")
       }
 
-      s"\n${Console.RED} [Factorio]: $formatted\n$context"
+      s"\n\n ${"[Factorio]:".yellow} $formatted \n$context"
     }
 
-    def error(s: Any) =
-      s"${Console.RED}$s${Console.RESET}"
-
-    def warning(s: Any) =
-      s"${Console.YELLOW}$s${Console.RESET}"
   }
 
   private[internal] def discoverConstructor(targetType: Type): Option[Symbol] = {

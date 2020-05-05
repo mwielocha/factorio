@@ -8,6 +8,7 @@ trait Syntax {
   type named = annotations.named
   type provides = annotations.provides
   type blueprint = annotations.blueprint
+  type overrides = annotations.overrides
   type replicated = annotations.replicated
 
   object Blank
@@ -16,4 +17,5 @@ trait Syntax {
   def assemble[T]: Assembler[T] = Assembler[T]
 
   implicit def intellijHack[T, R](in: Assembler[T]): R => () => T = ???
+
 }

@@ -1,5 +1,5 @@
-# factorio
 Tiny compile time dependency injection framework for Scala
+# factorio
 
 # Basic assumptions
 - everything is a singleton by default
@@ -127,10 +127,10 @@ val app = assembler()
 
 ```
 
-Blueprint traits will be searched in order of natural scala mixin folding. This means that earlier traits in mixin chain
-will override binding of later ones if they define bindings for the same type. This is usefull if you want to rewrite bindings,
-for example, for test scope, but you don't want to decompose the original blueprint chain:
-
+Blueprint traits will be searched in order of natural scala mixin linearization. This makes it tricky to override binders and providers by just the order of mixin-in traits.
+To make an explicit override you can use `@overrides` annotation that will always make the selected binder or provider a priority one. 
+Bear in mind that having multiple configurations for one type yields a warning but two configurations with `@overrides` annotation will yield a compile time error.
+Note: it is advised to only use `@overrides` in tests, never in production code.
 ```scala
 
 import factorio._

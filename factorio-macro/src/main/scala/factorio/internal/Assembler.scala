@@ -72,7 +72,7 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
       .getOrElse {
         c.abort(
           c.enclosingPosition,
-          Error("Don't know how to construct an instance of [{}]", rootType)(Nil)
+          Log("Don't know how to construct an instance of [{}]", rootType)(Nil)
         )
       }
 
@@ -91,8 +91,7 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
 
     c.info(
       c.enclosingPosition,
-      s"\n${Console.YELLOW}[Factorio]:" +
-        s"\n${Console.YELLOW}Done in $elapsed.\n${verbose}",
+      Log(s"\nDone in $elapsed.\n $verbose")(Nil),
       force = false
     )
 
@@ -120,7 +119,7 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
               named,
               c.abort(
                 c.enclosingPosition,
-                Error(
+                Log(
                   s"Couldn't create an instance of [{}] " +
                     s"when constructing [{}]",
                   named,
@@ -164,7 +163,7 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
     if (rootPath.contains(bindedType)) {
       c.abort(
         c.enclosingPosition,
-        Error(s"Circular dependency detected: {}", (rootPath :+ bindedType).mkString(" -> "))(rootPath)
+        Log(s"Circular dependency detected: {}", (rootPath :+ bindedType).mkString(" -> "))(rootPath)
       )
     }
 
@@ -174,7 +173,7 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
 
     providerOrNone match {
 
-      case Some(Provider(symbol, props)) =>
+      case Some(Provider(symbol, props, _)) =>
         // we have a provide, let's create an assembly
 
         val paramLists = symbol.asMethod.paramLists.namedTypeSignatures
@@ -189,8 +188,8 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
         if (bindedType.typeSymbol.isAbstract) {
           c.abort(
             c.enclosingPosition,
-            Error(
-              s"Cannot counstruct an instance of an abstract class " +
+            Log(
+              s"Cannot construct an instance of an abstract class " +
                 s"[{}], provide a concrete class binder or an instance provider.",
               bindedType
             )(rootPath)
@@ -202,7 +201,7 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
         val constructor = discoverConstructor(bindedType).getOrElse(
           c.abort(
             c.enclosingPosition,
-            Error(
+            Log(
               s"Cannot find a public constructor for " +
                 s"[{}], provide a concrete class binder or an instance provider.",
               bindedType

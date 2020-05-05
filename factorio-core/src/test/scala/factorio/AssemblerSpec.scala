@@ -175,35 +175,60 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     app.service.repository.database should not be (app.otherService.repository)
   }
 
-  it should "honor the order of blueprints (reverse to order of mixing folding)" in {
+  it should "honor `@overrides` annotation when analyzing binders" in {
 
     @blueprint
     trait MemberBlueprint {
+      @overrides
       private val memberBinder = bind[Member].to[MemberImpl]
     }
 
     @blueprint
     trait OtherMemberBlueprint {
+      //@overrides
       private val memberBinder = bind[Member].to[OtherMemberImpl]
     }
 
     val assembler = Assembler[Package](new MemberBlueprint with OtherMemberBlueprint {})
-    val otherAssembler = Assembler[Package](new OtherMemberBlueprint with MemberBlueprint {})
 
     val instance: Package = assembler()
-    val otherInstance: Package = otherAssembler()
 
     instance.member.getClass shouldBe classOf[MemberImpl]
-    otherInstance.member.getClass shouldBe classOf[OtherMemberImpl]
+  }
+
+  it should "warn about duplicated providers" in {
+
+    @blueprint
+    trait MemberBlueprint {
+
+      @provides
+      @overrides
+      def createMember: Member =
+        new MemberImpl
+    }
+
+    @blueprint
+    trait OtherMemberBlueprint {
+
+      @provides
+      def createOtherMember: Member =
+        new OtherMemberImpl
+    }
+
+    val assembler = Assembler[Package](new MemberBlueprint with OtherMemberBlueprint {})
+
+    val instance = assembler()
+
+    instance.member.getClass() shouldBe classOf[MemberImpl]
   }
 
   it should "not compile when circular dependency exists" in {
-    //Assembler[CircularDependency](Blank)
+    // Assembler[CircularDependency](Blank)
     assertDoesNotCompile("Assembler[CircularDependency](Blank)")
   }
 
   it should "not compile when no binding was provided for an interface" in {
-    //Assembler[App](Blank)
+    // Assembler[App](Blank)
     assertDoesNotCompile("Assembler[App](Blank)")
   }
 }
