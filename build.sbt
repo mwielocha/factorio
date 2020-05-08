@@ -4,7 +4,7 @@ val scalatestVersion = "3.1.1"
 
 val buildSettings = Seq(
   scalaVersion := "2.13.1",
-  version := "0.0.2",
+  version := "0.1.0",
   organization := "io.mwielocha",
   scalacOptions ++= Seq(
     "-language:postfixOps",
@@ -63,12 +63,12 @@ lazy val `factorio-core` = (project in file("factorio-core")).
   settings(buildSettings ++ Seq(
     name := "factorio-core",
     libraryDependencies ++= Seq(
-      "com.chuusai" %% "shapeless" % "2.3.3",
       "org.scalatest" %% "scalatest" % scalatestVersion % Test,
     )
   )).dependsOn(`factorio-annotations`, `factorio-macro` % "compile->compile;test->test")
 
 lazy val factorio = (project in file("."))
+  .settings(buildSettings ++ Seq(packagedArtifacts := Map.empty))
   .aggregate(`factorio-annotations`, `factorio-core`, `factorio-macro`)
 
 
