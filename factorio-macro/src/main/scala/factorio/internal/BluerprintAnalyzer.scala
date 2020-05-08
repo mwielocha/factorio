@@ -97,7 +97,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
           case Some(Provider(_, propsi, false)) if !isOverride =>
             c.warning(
               c.enclosingPosition,
-              Log("Found multiple providers for [{}], consider using {} to force select one of them.", named, "`@overrides`")(Nil)
+              Log("Found multiple providers for [{}], consider using {} to force-select one of them.", named, "`@overrides`")(Nil)
             )
 
           case _ =>
