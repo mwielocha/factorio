@@ -1,5 +1,5 @@
 Tiny compile time dependency injection framework for Scala
-# factorio
+# factorio [![Build Status](https://travis-ci.com/mwielocha/factorio.svg?branch=master)](https://travis-ci.com/mwielocha/factorio)
 
 # Basic assumptions
 - everything is a singleton by default
