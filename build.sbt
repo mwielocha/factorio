@@ -6,6 +6,8 @@ val buildSettings = Seq(
   scalaVersion := "2.13.1",
   version := "0.1.0",
   organization := "io.mwielocha",
+  organizationName := "mwielocha",
+  organizationHomepage := Some(url("http://mwielocha.io/")),
   scalacOptions ++= Seq(
     "-language:postfixOps",
     "-language:implicitConversions",
@@ -21,25 +23,25 @@ val buildSettings = Seq(
   publishArtifact in Test := false,
   pomIncludeRepository := { _ => false },
   homepage := Some(url("https://github.com/mwielocha/factorio")),
+  description := "Tiny, compile time dependency injection framework for Scala.",
   scmInfo := Some(
   ScmInfo(url("https://github.com/mwielocha/factorio"),
-    "git@github.com:mwielocha/factorio.git")),
+    "scm:git@github.com:mwielocha/factorio.git")),
   developers := List(
     Developer("mwielocha",
       "Mikolaj Wielocha",
       "mwielocha@icloud.com",
-      url("https://github.com/mwielocha"
-      )
+      url("https://github.com/mwielocha")
     )
   ),
   licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
   publishMavenStyle := true,
-  publishTo := Some(
-    if (isSnapshot.value)
-      Opts.resolver.sonatypeSnapshots
-    else
-      Opts.resolver.sonatypeStaging
-  )
+  publishTo := {
+    val nexus = "https://oss.sonatype.org/"
+    if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
+    else Some("releases" at nexus + "service/local/staging/deploy/maven2")
+  },
+  credentials += Credentials(Path.userHome / ".sbt" / ".sonatype_credentials")
 )
 
 lazy val `factorio-annotations` = (project in file("factorio-annotations")).
