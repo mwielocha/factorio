@@ -222,6 +222,16 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     instance.member.getClass() shouldBe classOf[MemberImpl]
   }
 
+  it should "assembler an app from a blueprint class" in {
+
+    val assembler = Assembler[App](new AppBlueprint)
+
+    val app = assembler()
+
+    app.service.getClass shouldBe classOf[ServiceImpl]
+    app.otherService.getClass shouldBe classOf[OtherServiceImpl]
+  }
+
   it should "not compile when circular dependency exists" in {
     // Assembler[CircularDependency](Blank)
     assertDoesNotCompile("Assembler[CircularDependency](Blank)")

@@ -22,14 +22,15 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
   )
 
   private[internal] def isBinder(m: Symbol): Boolean =
-    !m.isSynthetic &&
-      typeOf[factorio.Binder[_, _]].erasure ==
-        m.typeSignature.resultType.dealias.erasure
+    typeOf[factorio.Binder[_, _]].erasure ==
+      m.typeSignature.resultType.dealias.erasure &&
+      // accessor methods don't hold annotation so are not interesting to us
+      !(m.isPublic && m.isTerm && m.asTerm.isGetter && !m.asTerm.isVal)
 
-  private[internal] def isProvider(member: Symbol): Boolean =
-    member.isMethod &&
-      member.isPublic &&
-      member.isAnnotatedWith(typeOf[provides])
+  private[internal] def isProvider(m: Symbol): Boolean =
+    m.isMethod &&
+      m.isPublic &&
+      m.isAnnotatedWith(typeOf[provides])
 
   private[internal] def blueprintAnalysis: Blueprint = {
 

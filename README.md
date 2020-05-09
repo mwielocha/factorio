@@ -1,11 +1,25 @@
 Tiny compile time dependency injection framework for Scala
 # factorio [![Build Status](https://travis-ci.com/mwielocha/factorio.svg?branch=master)](https://travis-ci.com/mwielocha/factorio)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.mwielocha/factorio-core/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.mwielocha/factorio-core)
 
 # Basic assumptions
 - everything is a singleton by default
 - compile time checking for dependency graph correctness 
 
 # Usage
+
+### Installation
+
+```scala
+val factorioVersion = "0.1.1"
+
+libraryDependencies ++= Seq(
+  "io.mwielocha" %% "factorio-core" % factorioVersion,
+  "io.mwielocha" %% "factorio-annotations" % factorioVersion,
+  "io.mwielocha" %% "factorio-macro" % factorioVersion % "provided"
+)
+
+```
 
 ### Basic constructor composition
 ```scala
