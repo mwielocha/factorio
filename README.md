@@ -1,5 +1,5 @@
 Tiny compile time dependency injection framework for Scala
-# factorio [![Build Status](https://travis-ci.com/mwielocha/factorio.svg?branch=master)](https://travis-ci.com/mwielocha/factorio) [![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.mwielocha/factorio-core_2.13i/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.mwielocha/factorio-core_2.13)
+# factorio [![Build Status](https://travis-ci.com/mwielocha/factorio.svg?branch=master)](https://travis-ci.com/mwielocha/factorio) [![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.mwielocha/factorio-core_2.13/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.mwielocha/factorio-core_2.13)
 
 # Basic assumptions
 - everything is a singleton by default
