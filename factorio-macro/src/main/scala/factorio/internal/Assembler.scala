@@ -102,12 +102,15 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
 
     val trees = mutable.HashSet.empty[AssemblyTree]
 
-    val assemblies = analyzeType(
-      rootType,
-      Props(root = true),
-      Seq.empty,
-      Map.empty
-    )
+    val assemblies: Map[Named[Type], Assembly] =
+      analyzeType(
+        rootType,
+        Props(root = true),
+        Seq.empty,
+        Map.empty
+      )
+
+    assemblies.foreach(println)
 
     // values holds all types that we need to assemble
     for {
@@ -171,50 +174,57 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
     val bindedIndentifier = Named(bindedType, newProps.name)
     val providerOrNone = providers.get(bindedIndentifier)
 
-    providerOrNone match {
+    // we might already have this type from an interface binder, for example
+    if (output.contains(bindedIndentifier)) output
+    else {
 
-      case Some(Provider(symbol, props, _)) =>
-        // we have a provide, let's create an assembly
+      val bindedTypes: Map[Named[Type], Type] = binders.view.mapValues(_.`type`).to(Map)
 
-        val paramLists = symbol.asMethod.paramLists.namedTypeSignatures
-        val assembly = Assembly(`type`, symbol, newProps || props)(paramLists)
-        val newOutput = output + (bindedIndentifier -> assembly)
+      providerOrNone match {
 
-        analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
+        case Some(Provider(symbol, props, _)) =>
+          // we have a provide, let's create an assembly
 
-      case None =>
-        // no provider means we'll be calling a constructor but can we instantinate this type?
+          val paramLists = symbol.asMethod.paramLists.namedBindedTypeSignatures(bindedTypes)
+          val assembly = Assembly(`type`, symbol, newProps || props)(paramLists)
+          val newOutput = output + (bindedIndentifier -> assembly)
 
-        if (bindedType.typeSymbol.isAbstract) {
-          c.abort(
-            c.enclosingPosition,
-            Log(
-              s"Cannot construct an instance of an abstract class " +
-                s"[{}], provide a concrete class binder or an instance provider.",
-              bindedType
-            )(rootPath)
+          analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
+
+        case None =>
+          // no provider means we'll be calling a constructor but can we instantinate this type?
+
+          if (bindedType.typeSymbol.isAbstract) {
+            c.abort(
+              c.enclosingPosition,
+              Log(
+                s"Cannot construct an instance of an abstract class " +
+                  s"[{}], provide a concrete class binder or an instance provider.",
+                bindedType
+              )(rootPath)
+            )
+          }
+
+          // can we find a contructor then?
+
+          val constructor = discoverConstructor(bindedType).getOrElse(
+            c.abort(
+              c.enclosingPosition,
+              Log(
+                s"Cannot find a public constructor for " +
+                  s"[{}], provide a concrete class binder or an instance provider.",
+                bindedType
+              )(rootPath)
+            )
           )
-        }
 
-        // can we find a contructor then?
+          // if yes then let's create an assembly
 
-        val constructor = discoverConstructor(bindedType).getOrElse(
-          c.abort(
-            c.enclosingPosition,
-            Log(
-              s"Cannot find a public constructor for " +
-                s"[{}], provide a concrete class binder or an instance provider.",
-              bindedType
-            )(rootPath)
-          )
-        )
-
-        // if yes then let's create an assembly
-
-        val paramLists = constructor.asMethod.paramLists.namedTypeSignatures
-        val assembly = Assembly(`type`, bindedType, newProps)(paramLists)
-        val newOutput = output + (Named(`type`, newProps.name) -> assembly)
-        analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
+          val paramLists = constructor.asMethod.paramLists.namedBindedTypeSignatures(bindedTypes)
+          val assembly = Assembly(`type`, bindedType, newProps)(paramLists)
+          val newOutput = output + (Named(`type`, newProps.name) -> assembly)
+          analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
+      }
     }
   }
 
