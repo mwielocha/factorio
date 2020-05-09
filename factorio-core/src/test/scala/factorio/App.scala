@@ -38,3 +38,5 @@ class MemberImpl extends Member
 class OtherMemberImpl extends Member
 
 class Package(val member: Member)
+
+class SingleServiceApp(val service: Service, val serviceImpl: ServiceImpl)
