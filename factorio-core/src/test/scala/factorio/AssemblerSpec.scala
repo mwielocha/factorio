@@ -222,7 +222,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     instance.member.getClass() shouldBe classOf[MemberImpl]
   }
 
-  it should "assembler an app from a blueprint class" in {
+  it should "assemble an app from a blueprint class" in {
 
     val assembler = Assembler[App](new AppBlueprint)
 
@@ -230,6 +230,24 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     app.service.getClass shouldBe classOf[ServiceImpl]
     app.otherService.getClass shouldBe classOf[OtherServiceImpl]
+  }
+
+  it should "reuse a more specific class in a binding" in {
+
+    @blueprint
+    class SingleServiceAppBlueprint {
+
+      val serviceBinder =
+        bind[Service].to[ServiceImpl]
+
+    }
+
+    val assembler = Assembler[SingleServiceApp](new SingleServiceAppBlueprint)
+
+    val app = assembler()
+
+    app.service shouldBe app.serviceImpl
+
   }
 
   it should "not compile when circular dependency exists" in {

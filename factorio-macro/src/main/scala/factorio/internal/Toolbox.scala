@@ -85,13 +85,17 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
 
   private[internal] implicit class SymbolListsExtension(symbolLists: List[List[Symbol]]) {
 
-    def namedTypeSignatures: List[List[Named[Type]]] =
+    def namedBindedTypeSignatures(bindedTypes: Map[Named[Type], Type]): List[List[Named[Type]]] =
       symbolLists.map {
         for {
           symbol <- _
           name = symbol.named
           symbolType = symbol.typeSignature.dealias
-        } yield Named(symbolType, name)
+          identifier = Named(symbolType, name)
+          bindedType = bindedTypes
+            .get(identifier)
+            .getOrElse(symbolType)
+        } yield Named(bindedType, name)
       }
   }
 
