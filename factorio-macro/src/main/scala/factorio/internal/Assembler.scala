@@ -110,8 +110,6 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
         Map.empty
       )
 
-    assemblies.foreach(println)
-
     // values holds all types that we need to assemble
     for {
       assembly <- assemblies.values
