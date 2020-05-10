@@ -10,7 +10,7 @@ Tiny compile time dependency injection framework for Scala
 ### Installation
 
 ```scala
-val factorioVersion = "0.1.2"
+val factorioVersion = "0.1.3"
 
 libraryDependencies ++= Seq(
   "io.mwielocha" %% "factorio-core" % factorioVersion,
@@ -18,6 +18,17 @@ libraryDependencies ++= Seq(
   "io.mwielocha" %% "factorio-macro" % factorioVersion % "provided"
 )
 
+```
+
+### Options
+
+For debugging puproses it's possible to enable compiler log that will print out generated assembler code:
+
+``` scala
+// in project
+scalacOptions ++= Seq(
+    "-Xmacro-settings:factorio-verbose"
+  )
 ```
 
 ### Basic constructor composition

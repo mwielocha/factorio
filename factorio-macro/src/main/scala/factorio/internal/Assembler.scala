@@ -9,6 +9,8 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
 
   import c.universe._
 
+  private lazy val settings: Settings = Settings(c.settings)
+
   private final val bluerprintAnalyzer =
     new BluerprintAnalyzer[c.type, B](c)(weakTypeTag[B])
 
@@ -89,11 +91,12 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
 
     val elapsed = stopWatch()
 
-    c.info(
-      c.enclosingPosition,
-      Log(s"\nDone in $elapsed.\n $verbose")(Nil),
-      force = false
-    )
+    if (settings.verbose)
+      c.info(
+        c.enclosingPosition,
+        Log(s"\nDone in $elapsed.\n $verbose")(Nil),
+        force = false
+      )
 
     output
   }

@@ -4,7 +4,7 @@ val scalatestVersion = "3.1.1"
 
 val buildSettings = Seq(
   scalaVersion := "2.13.1",
-  version := "0.1.2",
+  version := "0.1.3",
   organization := "io.mwielocha",
   organizationName := "mwielocha",
   organizationHomepage := Some(url("http://mwielocha.io/")),
@@ -17,6 +17,7 @@ val buildSettings = Seq(
     "-language:existentials",
     "-language:higherKinds",
     "-language:postfixOps",
+    "-Xmacro-settings:factorio-verbose"
   ),
   scalafmtOnCompile in ThisBuild := true,
   publishMavenStyle := true,
