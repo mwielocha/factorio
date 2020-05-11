@@ -250,6 +250,48 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   }
 
+  it should "find a `@named`` provider with a stable identifier" in {
+
+    @blueprint
+    class StableIdentifierAppBlueprint {
+
+      @provides
+      //@named(StableIdentifierApp.thatClient)
+      @named(StableIdentifierApp.thatClient)
+      def thatClient: Client =
+        new ThatClientImpl
+
+    }
+
+    val assembler = Assembler[StableIdentifierApp](new StableIdentifierAppBlueprint)
+
+    val app = assembler()
+
+    app.client.getClass() shouldBe classOf[ThatClientImpl]
+
+  }
+
+  it should "find a `@javax.Inject.Named` provider with a stable identifier" in {
+
+    @blueprint
+    class StableIdentifierAppBlueprint {
+
+      @provides
+      //@named(StableIdentifierApp.thatClient)
+      @javax.inject.Named(StableIdentifierApp.thatClient)
+      def thatClient: Client =
+        new ThatClientImpl
+
+    }
+
+    val assembler = Assembler[StableIdentifierApp](new StableIdentifierAppBlueprint)
+
+    val app = assembler()
+
+    app.client.getClass() shouldBe classOf[ThatClientImpl]
+
+  }
+
   it should "not compile when circular dependency exists" in {
     // Assembler[CircularDependency](Blank)
     assertDoesNotCompile("Assembler[CircularDependency](Blank)")
