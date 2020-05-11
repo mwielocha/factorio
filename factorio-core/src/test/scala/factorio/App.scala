@@ -40,3 +40,12 @@ class OtherMemberImpl extends Member
 class Package(val member: Member)
 
 class SingleServiceApp(val service: Service, val serviceImpl: ServiceImpl)
+
+object StableIdentifierApp {
+
+  final val thatClient = "thatClient"
+  final val otherClient = "otherClient"
+
+}
+
+class StableIdentifierApp(@named(name = StableIdentifierApp.thatClient) val client: Client)

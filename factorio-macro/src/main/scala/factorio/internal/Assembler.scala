@@ -32,6 +32,9 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
     val parameterLists: ParameterLists
   ) {
 
+    override def toString: String =
+      s"Assembly(${`type`},$props,$parameterLists)"
+
     val tname = uname(`type`, props.name)
     def createTree: ArgumentLists => Tree
 
@@ -112,6 +115,17 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
         Seq.empty,
         Map.empty
       )
+
+    if (settings.debug) {
+      c.echo(
+        c.enclosingPosition,
+        assemblies
+          .map {
+            case (name, assembly) =>
+              s"Assembly for key ${name.toString.yellow}: $assembly"
+          }.mkString("\n\n", "\n", "\n\n")
+      )
+    }
 
     // values holds all types that we need to assemble
     for {
@@ -201,7 +215,7 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
               Log(
                 s"Cannot construct an instance of an abstract class " +
                   s"[{}], provide a concrete class binder or an instance provider.",
-                bindedType
+                bindedIndentifier
               )(rootPath)
             )
           }
@@ -214,7 +228,7 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
               Log(
                 s"Cannot find a public constructor for " +
                   s"[{}], provide a concrete class binder or an instance provider.",
-                bindedType
+                bindedIndentifier
               )(rootPath)
             )
           )

@@ -3,6 +3,8 @@ package factorio.internal
 import factorio.annotations.named
 
 import scala.reflect.macros.blackbox
+import scala.reflect.api.Constants
+import java.util.regex.Matcher
 
 private[internal] trait Toolbox[+C <: blackbox.Context] {
 
@@ -17,7 +19,7 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
     def apply(msg: String, args: Any*)(rootPath: Seq[Type] = Nil): String = {
       val formatted = args.foldLeft(msg) {
         case (msg, arg) =>
-          msg.replaceFirst("\\{}", s"$arg".yellow)
+          msg.replaceFirst("\\{\\}", Matcher.quoteReplacement(s"$arg".yellow))
       }
 
       val context = rootPath match {
@@ -62,25 +64,38 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
 
   private[internal] implicit class SymbolExtension(s: Symbol) {
 
+    private def getNamedValue(annotation: Tree, argument: Tree): Option[String] = argument match {
+      case q"value = ${Literal(Constant(name: String)) }" => Some(name)
+      case q"name = ${Literal(Constant(name: String)) }"  => Some(name) // for javax.inject.Named
+      case Literal(Constant(name: String))                => Some(name) // for factorio.named
+      case x =>
+        c.abort(
+          c.enclosingPosition,
+          Log(
+            s"Error analyzing [{}] annotation. Argument [{}] is not a stable identifier, " +
+              s"consider using either a string literal or a final, static val.",
+            annotation.tpe,
+            x
+          )(Nil)
+        )
+    }
+
+    private val isNamedAnnotation: Type => Boolean =
+      Set(typeOf[named], typeOf[javax.inject.Named])
+
     def isAnnotatedWith(annotations: Type*): Boolean =
       s.annotations.exists(t => annotations.contains(t.tree.tpe))
 
-    def named: Option[String] = {
-      val scala = s.annotations
-        .filter(_.tree.tpe == typeOf[named])
-        .flatMap(_.tree.children.tail.headOption)
+    def named: Option[String] =
+      s.annotations
+        .map(_.tree)
+        .filter(x => isNamedAnnotation(x.tpe.dealias))
+        .flatMap { annotation =>
+          annotation.children.tail.headOption
+            .flatMap(getNamedValue(annotation, _))
+        }
         .headOption
 
-      scala
-        .orElse {
-          // fallback to javax.inject.Named for backwards compatibility
-          s.annotations
-            .filter(_.tree.tpe == typeOf[javax.inject.Named])
-            .flatMap(_.tree.children.tail.headOption)
-            .headOption
-            .flatMap(_.children.lastOption)
-        }.map(_.toString()).map(x => x.substring(1, x.length - 1))
-    }
   }
 
   private[internal] implicit class SymbolListsExtension(symbolLists: List[List[Symbol]]) {
