@@ -292,6 +292,25 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   }
 
+  it should "assembler an app with alias type provider" in {
+
+    @blueprint
+    class BoxedAppBlueprint {
+
+      @provides
+      def serviceBox(repo: Repository): BoxedApp.ServiceBox =
+        new Box(new ServiceImpl(repo))
+
+    }
+
+    val assembler = Assembler[BoxedApp](new BoxedAppBlueprint)
+
+    val app = assembler()
+
+    app.serviceBox.value.getClass() shouldBe classOf[ServiceImpl]
+
+  }
+
   it should "not compile when circular dependency exists" in {
     // Assembler[CircularDependency](Blank)
     assertDoesNotCompile("Assembler[CircularDependency](Blank)")
