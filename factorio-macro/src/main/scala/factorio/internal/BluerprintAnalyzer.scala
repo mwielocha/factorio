@@ -23,7 +23,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
   private[internal] def isBinder(m: Symbol): Boolean =
     typeOf[factorio.Binder[_, _]].erasure ==
-      m.typeSignature.resultType.dealias.erasure &&
+      m.typeSignature.resultType.dealiasRecursively.erasure &&
       // accessor methods don't hold annotation so are not interesting to us
       !(m.isPublic && m.isTerm && m.asTerm.isGetter && !m.asTerm.isVal)
 
@@ -51,8 +51,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
       if (isBinder(declaration)) {
 
         val targetType :: bindedType :: Nil =
-          declaration.typeSignature.resultType.dealias.typeArgs
-            .map(_.dealias)
+          declaration.typeSignature.resultType.dealiasRecursively.typeArgs.map(_.dealiasRecursively)
 
         val named = Named(targetType, name)
         val props = Props(name, replicated)
@@ -80,7 +79,8 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
       } else if (isProvider(declaration)) {
 
-        val targetType = declaration.typeSignature.resultType.dealias
+        val targetType = declaration.typeSignature.resultType.dealiasRecursively
+
         val named = Named(targetType, name)
         val props = Props(name, replicated)
 

@@ -62,26 +62,42 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
     TermName(output)
   }
 
+  private val isNamedAnnotation: Type => Boolean =
+    Set(typeOf[named], typeOf[javax.inject.Named])
+
+  private[internal] def namedValue(s: Symbol): Option[String] =
+    namedValue(s, s.annotations)
+
+  private[internal] def namedValue(s: Symbol, annotations: List[Annotation]): Option[String] = {
+    annotations
+      .map(_.tree)
+      .filter(x => isNamedAnnotation(x.tpe.dealias))
+      .flatMap { annotation =>
+        annotation.children.tail.headOption
+          .flatMap(namedValue(annotation, _))
+      }
+      .headOption
+  }
+
+  private[internal] def namedValue(annotation: Tree, argument: Tree): Option[String] = argument match {
+    case q"value = ${Literal(Constant(name: String)) }" => Some(name) // for javax.inject.Named
+    case q"name = ${Literal(Constant(name: String)) }"  => Some(name) // for factorio.named
+    case Literal(Constant(name: String))                => Some(name)
+    case x =>
+      c.abort(
+        c.enclosingPosition,
+        Log(
+          s"Error analyzing [{}] annotation. Argument [{}] is not a stable identifier, " +
+            s"consider using either a string literal or a final, static val.",
+          annotation.tpe,
+          x
+        )(Nil)
+      )
+  }
+
   private[internal] implicit class SymbolExtension(s: Symbol) {
 
-    private def getNamedValue(annotation: Tree, argument: Tree): Option[String] = argument match {
-      case q"value = ${Literal(Constant(name: String)) }" => Some(name)
-      case q"name = ${Literal(Constant(name: String)) }"  => Some(name) // for javax.inject.Named
-      case Literal(Constant(name: String))                => Some(name) // for factorio.named
-      case x =>
-        c.abort(
-          c.enclosingPosition,
-          Log(
-            s"Error analyzing [{}] annotation. Argument [{}] is not a stable identifier, " +
-              s"consider using either a string literal or a final, static val.",
-            annotation.tpe,
-            x
-          )(Nil)
-        )
-    }
-
-    private val isNamedAnnotation: Type => Boolean =
-      Set(typeOf[named], typeOf[javax.inject.Named])
+    private val _ = s.typeSignature // we need this because otheriwse scalac looses annotation information
 
     def isAnnotatedWith(annotations: Type*): Boolean =
       s.annotations.exists(t => annotations.contains(t.tree.tpe))
@@ -92,7 +108,7 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
         .filter(x => isNamedAnnotation(x.tpe.dealias))
         .flatMap { annotation =>
           annotation.children.tail.headOption
-            .flatMap(getNamedValue(annotation, _))
+            .flatMap(namedValue(annotation, _))
         }
         .headOption
 
@@ -105,13 +121,20 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
         for {
           symbol <- _
           name = symbol.named
-          symbolType = symbol.typeSignature.dealias
+          symbolType = symbol.typeSignature.dealiasRecursively
           identifier = Named(symbolType, name)
           bindedType = bindedTypes
             .get(identifier)
             .getOrElse(symbolType)
         } yield Named(bindedType, name)
       }
+  }
+
+  private[internal] implicit class TypeExtendion(tpe: Type) {
+
+    def dealiasRecursively: Type =
+      tpe.dealias.map(_.dealias)
+
   }
 
   private[internal] def function(tname: TermName, resultType: Type, of: Tree) = q"def $tname: $resultType = $of"

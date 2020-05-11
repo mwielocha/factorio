@@ -4,6 +4,7 @@ import factorio.annotations.replicated
 
 import scala.collection.mutable
 import scala.reflect.macros.blackbox
+import factorio.annotations.provides
 
 private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
 
@@ -16,8 +17,8 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
 
   import bluerprintAnalyzer._
 
-  private lazy val rootType = weakTypeTag[T].tpe.dealias
-  private lazy val blueprintType = weakTypeTag[B].tpe.dealias
+  private lazy val rootType = weakTypeTag[T].tpe.dealiasRecursively
+  private lazy val blueprintType = weakTypeTag[B].tpe.dealiasRecursively
 
   private lazy val blueprintAnalysis = bluerprintAnalyzer.blueprintAnalysis
 

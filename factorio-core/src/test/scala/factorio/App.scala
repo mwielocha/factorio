@@ -49,3 +49,12 @@ object StableIdentifierApp {
 }
 
 class StableIdentifierApp(@named(name = StableIdentifierApp.thatClient) val client: Client)
+
+class Box[T](val value: T)
+
+class BoxedApp(val serviceBox: Box[Service])
+
+object BoxedApp {
+  type AppService = Service
+  type ServiceBox = Box[AppService]
+}
