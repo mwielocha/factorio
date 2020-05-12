@@ -97,7 +97,9 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
 
   private[internal] implicit class SymbolExtension(s: Symbol) {
 
-    private val _ = s.typeSignature // we need this because otheriwse scalac looses annotation information
+    locally {
+      val _ = s.typeSignature // we need this because otheriwse scalac looses annotation information
+    }
 
     def isAnnotatedWith(annotations: Type*): Boolean =
       s.annotations.exists(t => annotations.contains(t.tree.tpe))
