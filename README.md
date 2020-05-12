@@ -10,7 +10,7 @@ Tiny compile time dependency injection framework for Scala
 ### Installation
 
 ```scala
-val factorioVersion = "0.1.5"
+val factorioVersion = "0.1.6"
 
 libraryDependencies ++= Seq(
   "io.mwielocha" %% "factorio-core" % factorioVersion,
