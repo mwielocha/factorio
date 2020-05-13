@@ -311,6 +311,25 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   }
 
+  it should "assembler an app with type syntax binder" in {
+
+    @blueprint
+    class AppBlueprint {
+
+      val a: Service to ServiceImpl = bind[Service].to
+      val b: OtherService to OtherServiceImpl = binder
+
+    }
+
+    val assembler = Assembler[App](new AppBlueprint)
+
+    val app = assembler()
+
+    app.service.getClass() shouldBe classOf[ServiceImpl]
+    app.otherService.getClass() shouldBe classOf[OtherServiceImpl]
+
+  }
+
   it should "not compile when circular dependency exists" in {
     // Assembler[CircularDependency](Blank)
     assertDoesNotCompile("Assembler[CircularDependency](Blank)")

@@ -1,9 +1,10 @@
 package factorio.internal
 
-import factorio.annotations.{ blueprint, provides, replicated, overrides }
+import factorio.annotations.{ blueprint, provides, replicated, overrides, binds }
 
 import scala.reflect.macros.blackbox
 import scala.collection.mutable
+import factorio.Binder
 
 class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
   import c.universe._
@@ -39,6 +40,59 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
     for {
       baseClassSymbol <- blueprintBaseClassSymbols
+      _ = for {
+        annotation <- baseClassSymbol.annotations
+        if (annotation.tree.tpe.erasure == typeOf[binds[_]].erasure)
+        annotationTree = annotation.tree
+        _ = println(annotationTree)
+      } yield {
+
+        val targetType :: bindedType :: Nil = annotationTree.tpe.typeArgs.head.typeArgs.map(_.dealiasRecursively)
+
+        //         case q"name = ${Literal(Constant(name: String)) }"  => Some(name) // for factorio.named
+        // case Literal(Constant(name: String))                => Some(name)
+
+        annotationTree.children.tail match {
+
+          case Nil =>
+            val props = Props(None, false)
+            binders += (Named(targetType, None) -> Binder(bindedType, props, false))
+
+          case Literal(Constant(name: String)) :: Nil =>
+            val props = Props(Some(name), false)
+            binders += (Named(targetType, Some(name)) -> Binder(bindedType, props, false))
+
+          case q"named = ${Literal(Constant(name: String)) }" :: Nil =>
+            val props = Props(Some(name), false)
+            binders += (Named(targetType, Some(name)) -> Binder(bindedType, props, false))
+
+          case q"named = ${Literal(Constant(name: String)) }" :: Literal(Constant(replicated: Boolean)) :: Nil =>
+            val props = Props(Some(name), replicated)
+            binders += (Named(targetType, Some(name)) -> Binder(bindedType, props, false))
+
+          case q"named = ${Literal(Constant(name: String)) }" :: q"replicated = ${Literal(Constant(replicated: Boolean)) }" :: Nil =>
+            val props = Props(Some(name), replicated)
+            binders += (Named(targetType, Some(name)) -> Binder(bindedType, props, false))
+
+          case q"named = ${Literal(Constant(name: String)) }" :: q"replicated = ${Literal(Constant(replicated: Boolean)) }" :: q"overrides = ${Literal(Constant(isOverride: Boolean)) }" :: Nil =>
+            val props = Props(Some(name), replicated)
+            binders += (Named(targetType, Some(name)) -> Binder(bindedType, props, isOverride))
+
+          case Literal(Constant(replicated: Boolean)) :: Literal(Constant(isOverride: Boolean)) :: Nil =>
+            val props = Props(None, replicated)
+            binders += (Named(targetType, None) -> Binder(bindedType, props, isOverride))
+
+          case q"replicated = ${Literal(Constant(replicated: Boolean)) }" :: Nil =>
+            val props = Props(None, replicated)
+            binders += (Named(targetType, None) -> Binder(bindedType, props, false))
+
+          case Literal(Constant(replicated: Boolean)) :: Nil =>
+            val props = Props(None, false)
+            binders += (Named(targetType, None) -> Binder(bindedType, props, replicated))
+
+          case _ => // ignore
+        }
+      }
       declaration <- baseClassSymbol.typeSignature.decls
       if !declaration.isConstructor
     } yield {
