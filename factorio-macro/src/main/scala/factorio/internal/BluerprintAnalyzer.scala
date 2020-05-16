@@ -139,7 +139,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
       } else if (isProvider(declaration)) {
 
-        val targetType = declaration.typeSignature.resultType.dealiasAll
+        val targetType = declaration.asMethod.returnType.dealiasAll
 
         val named = Named(targetType, name)
         val props = Props(name, replicated)

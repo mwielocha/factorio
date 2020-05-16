@@ -214,6 +214,21 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
           // no provider means we'll be calling a constructor but can we instantinate this type?
 
           if (bindedType.typeSymbol.isAbstract) {
+
+            if (settings.debug) {
+              val out = providers
+                .map {
+                  case (k, v) =>
+                    new StringBuilder("[".yellow)
+                      .append(k.toString.yellow)
+                      .append("]".yellow)
+                      .append(": ")
+                      .append(v.toString)
+                      .toString()
+                }.mkString("\n")
+              c.echo(c.enclosingPosition, Log("\nProviders:\n" + out)(Nil))
+            }
+
             c.abort(
               c.enclosingPosition,
               Log(
