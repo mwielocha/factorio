@@ -1,9 +1,10 @@
 package factorio.internal
 
-import factorio.annotations.{ blueprint, provides, replicated, overrides }
+import factorio.annotations.{ blueprint, provides, replicated, overrides, binds }
 
 import scala.reflect.macros.blackbox
 import scala.collection.mutable
+import factorio.Binder
 
 class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val c: C) extends Toolbox[C] {
   import c.universe._
@@ -23,7 +24,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
   private[internal] def isBinder(m: Symbol): Boolean =
     typeOf[factorio.Binder[_, _]].erasure ==
-      m.typeSignature.resultType.dealiasRecursively.erasure &&
+      m.typeSignature.resultType.dealiasAll.erasure &&
       // accessor methods don't hold annotation so are not interesting to us
       !(m.isPublic && m.isTerm && m.asTerm.isGetter && !m.asTerm.isVal)
 
@@ -32,6 +33,64 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
       m.isPublic &&
       m.isAnnotatedWith(typeOf[provides])
 
+  private[internal] def analyzeBaseClassBinders(
+    annotations: List[Annotation],
+    binders: Map[Named[Type], Binder]
+  ): Map[Named[Type], Binder] = {
+
+    val output = mutable.Map.empty[Named[Type], Binder]
+
+    for {
+      annotation <- annotations
+      if (annotation.tree.tpe.erasure == typeOf[binds[_]].erasure)
+      annotationTree = annotation.tree
+      targetType :: bindedType :: Nil = annotationTree.tpe.typeArgs.head.typeArgs.map(_.dealiasAll)
+      binder @ Binder(_, Props(name, _, _), isOverride) = annotationTree.children.tail.foldLeft(Binder(bindedType, Props(), false)) {
+
+        case (binder @ Binder(_, props, _), q"factorio.this.`package`.replicated") =>
+          binder.copy(props = props || Props(repl = true))
+
+        case (binder, q"factorio.this.`package`.overrides") =>
+          binder.copy(isOverride = true)
+
+        case (binder @ Binder(_, Props(Some(_), _, _), _), q"factorio.this.`package`.named.apply(${Literal(Constant(name: String)) })") =>
+          c.abort(annotationTree.pos, Log("`@binds` annotation accepts only one `named` parameter.")(Nil))
+
+        case (binder @ Binder(_, props, _), q"factorio.this.`package`.named.apply(${Literal(Constant(name: String)) })") =>
+          binder.copy(props = props || Props(Some(name)))
+
+        case (binder, _) =>
+          c.abort(annotationTree.pos, Log("`@binds` annotation requires stable parameter values.")(Nil))
+      }
+      named = Named(targetType, name)
+    } yield {
+
+      binders.get(named) match {
+
+        case Some(Binder(_, props, true)) if isOverride =>
+          c.abort(
+            c.enclosingPosition,
+            Log("Found multiple binders with {} for [{}], cannot figure out which one to use.", "`@overrides`", named)(Nil)
+          )
+
+        case Some(Binder(_, props, true)) =>
+        // previous one is an override, skipping
+
+        case Some(Binder(_, props, false)) if !isOverride =>
+          c.warning(
+            c.enclosingPosition,
+            Log("Found multiple binders for [{}], consider using {} to force select one of them.", named, "`@overrides`")(Nil)
+          )
+
+        case _ =>
+          output += (named -> binder)
+      }
+
+    }
+
+    output.to(Map)
+  }
+
   private[internal] def blueprintAnalysis: Blueprint = {
 
     val binders = mutable.Map.empty[Named[Type], Binder]
@@ -39,6 +98,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
     for {
       baseClassSymbol <- blueprintBaseClassSymbols
+      _ = binders ++= analyzeBaseClassBinders(baseClassSymbol.annotations, binders.to(Map))
       declaration <- baseClassSymbol.typeSignature.decls
       if !declaration.isConstructor
     } yield {
@@ -51,7 +111,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
       if (isBinder(declaration)) {
 
         val targetType :: bindedType :: Nil =
-          declaration.typeSignature.resultType.dealiasRecursively.typeArgs.map(_.dealiasRecursively)
+          declaration.typeSignature.resultType.dealiasAll.typeArgs.map(_.dealiasAll)
 
         val named = Named(targetType, name)
         val props = Props(name, replicated)
@@ -79,7 +139,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
       } else if (isProvider(declaration)) {
 
-        val targetType = declaration.typeSignature.resultType.dealiasRecursively
+        val targetType = declaration.typeSignature.resultType.dealiasAll
 
         val named = Named(targetType, name)
         val props = Props(name, replicated)

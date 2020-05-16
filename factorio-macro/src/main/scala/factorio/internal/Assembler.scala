@@ -17,8 +17,8 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
 
   import bluerprintAnalyzer._
 
-  private lazy val rootType = weakTypeTag[T].tpe.dealiasRecursively
-  private lazy val blueprintType = weakTypeTag[B].tpe.dealiasRecursively
+  private lazy val rootType = weakTypeTag[T].tpe.dealiasAll
+  private lazy val blueprintType = weakTypeTag[B].tpe.dealiasAll
 
   private lazy val blueprintAnalysis = bluerprintAnalyzer.blueprintAnalysis
 
@@ -26,6 +26,8 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
 
   private type ArgumentLists = List[List[TermName]]
   private type ParameterLists = List[List[Named[Type]]]
+
+  private case class NamedProps(named: Named[Type], props: Props)
 
   private abstract class Assembly(
     val `type`: Type,
@@ -168,12 +170,11 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
     val Blueprint(binders, providers) = blueprintAnalysis
 
     // first, check if this is a binded type
-    val bindedType = binders.view
-      .mapValues(_.`type`)
-      .getOrElse(Named(`type`, props.name), `type`)
+    val binder = binders.get(Named(`type`, props.name))
+    val bindedType = binder.map(_.`type`).getOrElse(`type`)
 
     // let's also check what annotations does this type has
-    val newProps = props.copy(
+    val newProps = props || Props(
       repl = bindedType.typeSymbol
         .isAnnotatedWith(typeOf[replicated])
     )
@@ -201,11 +202,13 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
         case Some(Provider(symbol, props, _)) =>
           // we have a provide, let's create an assembly
 
-          val paramLists = symbol.asMethod.paramLists.namedBindedTypeSignatures(bindedTypes)
+          val paramSymbolLists = symbol.asMethod.paramLists
+          val paramPropsLists = namedPropsBindedTypeSignatures(paramSymbolLists, binders)
+          val paramLists = paramPropsLists.map(_.map(_.named))
           val assembly = Assembly(`type`, symbol, newProps || props)(paramLists)
           val newOutput = output + (bindedIndentifier -> assembly)
 
-          analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
+          analyzeParameterLists(paramPropsLists, rootPath :+ `type`, newOutput)
 
         case None =>
           // no provider means we'll be calling a constructor but can we instantinate this type?
@@ -236,25 +239,45 @@ private[internal] class Assembler[C <: blackbox.Context, T : C#WeakTypeTag, B : 
 
           // if yes then let's create an assembly
 
-          val paramLists = constructor.asMethod.paramLists.namedBindedTypeSignatures(bindedTypes)
+          val paramSymbolLists = constructor.asMethod.paramLists
+          val paramPropsLists = namedPropsBindedTypeSignatures(paramSymbolLists, binders)
+          val paramLists = paramPropsLists.map(_.map(_.named))
           val assembly = Assembly(`type`, bindedType, newProps)(paramLists)
           val newOutput = output + (Named(`type`, newProps.name) -> assembly)
-          analyzeParameterLists(paramLists, rootPath :+ `type`, newOutput)
+
+          analyzeParameterLists(paramPropsLists, rootPath :+ `type`, newOutput)
       }
     }
   }
 
+  private def namedPropsBindedTypeSignatures(
+    symbolLists: List[List[Symbol]],
+    binders: Map[Named[Type], Binder]
+  ): List[List[NamedProps]] = {
+    symbolLists.map {
+      for {
+        symbol <- _
+        name = symbol.named
+        symbolType = symbol.typeSignature.dealiasAll
+        identifier = Named(symbolType, name)
+        Binder(bindedType, props, _) = binders
+          .get(identifier)
+          .getOrElse(Binder(symbolType, Props(name), false))
+      } yield NamedProps(Named(bindedType, name), props)
+    }
+  }
+
   private def analyzeParameterLists(
-    parameterLists: ParameterLists,
+    parameterPropsLists: List[List[NamedProps]],
     rootPath: Seq[Type],
     output: Map[Named[Type], Assembly]
   ): Map[Named[Type], Assembly] = {
 
-    parameterLists.foldLeft(output) {
+    parameterPropsLists.foldLeft(output) {
       case (output, list) =>
         list.foldLeft(output) {
-          case (output, Named(parameterType, name)) =>
-            analyzeType(parameterType, Props(name), rootPath, output)
+          case (output, NamedProps(Named(parameterType, name), props)) =>
+            analyzeType(parameterType, props, rootPath, output)
         }
     }
   }

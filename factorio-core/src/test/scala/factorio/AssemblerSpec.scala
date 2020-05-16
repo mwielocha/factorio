@@ -250,6 +250,25 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   }
 
+  it should "replicate a more specific class in a binding" in {
+
+    @blueprint
+    class SingleServiceAppBlueprint {
+
+      @replicated
+      val serviceBinder =
+        bind[Service].to[ServiceImpl]
+
+    }
+
+    val assembler = Assembler[SingleServiceApp](new SingleServiceAppBlueprint)
+
+    val app = assembler()
+
+    app.service should not be (app.serviceImpl)
+
+  }
+
   it should "find a `@named`` provider with a stable identifier" in {
 
     @blueprint
@@ -308,6 +327,25 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     val app = assembler()
 
     app.serviceBox.value.getClass() shouldBe classOf[ServiceImpl]
+
+  }
+
+  it should "assembler an app with type syntax binder" in {
+
+    @blueprint
+    class AppBlueprint {
+
+      val a: Service to ServiceImpl = bind[Service].to
+      val b: OtherService to OtherServiceImpl = binder
+
+    }
+
+    val assembler = Assembler[App](new AppBlueprint)
+
+    val app = assembler()
+
+    app.service.getClass() shouldBe classOf[ServiceImpl]
+    app.otherService.getClass() shouldBe classOf[OtherServiceImpl]
 
   }
 
