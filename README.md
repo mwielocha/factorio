@@ -10,7 +10,7 @@ Tiny compile time dependency injection framework for Scala
 ### Installation
 
 ```scala
-val factorioVersion = "0.1.6"
+val factorioVersion = "0.2.0"
 
 libraryDependencies ++= Seq(
   "io.mwielocha" %% "factorio-core" % factorioVersion,
@@ -83,6 +83,30 @@ val app = assembler()
 ```
 
 You can also simply `bind` implementations to super classes or interfaces:
+```scala
+
+import factorio._
+
+class Repository
+trait Service
+class ServiceImpl(val repository: Repository) extends Service
+
+class App(service: Service)
+
+@blueprint
+@binds[Service to ServiceImpl]
+class Blueprint { }
+
+val assembler = Assembler[App](new Blueprint)
+
+val app = assembler()
+
+// val blueprint = new Blueprint
+// new App(new ServiceImpl(new Repository)))
+
+```
+
+An alternative `bind` syntax, more similar to existing runtime based di frameworks:
 ```scala
 
 import factorio._
@@ -197,10 +221,8 @@ val app = assembler()
 class DummyRepository extends Repository
 
 @blueprint
-trait TestRepositoryBlueprint {
-  
-  val dummyRepositoryBinder = bind[Repository].to[DummyRepository]
-}
+@binds[Repository to DummyRepository]
+trait TestRepositoryBlueprint
 
 // this will overwirte reposiry provider from `RepositoryBlueprint`
 trait TestBlueprint extends TestRepositoryBlueprint with Blueprint 
