@@ -24,7 +24,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
   private[internal] def isBinder(m: Symbol): Boolean =
     typeOf[factorio.Binder[_, _]].erasure ==
-      m.typeSignature.resultType.dealiasRecursively.erasure &&
+      m.typeSignature.resultType.dealiasAll.erasure &&
       // accessor methods don't hold annotation so are not interesting to us
       !(m.isPublic && m.isTerm && m.asTerm.isGetter && !m.asTerm.isVal)
 
@@ -44,7 +44,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
       annotation <- annotations
       if (annotation.tree.tpe.erasure == typeOf[binds[_]].erasure)
       annotationTree = annotation.tree
-      targetType :: bindedType :: Nil = annotationTree.tpe.typeArgs.head.typeArgs.map(_.dealiasRecursively)
+      targetType :: bindedType :: Nil = annotationTree.tpe.typeArgs.head.typeArgs.map(_.dealiasAll)
       binder @ Binder(_, Props(name, _, _), isOverride) = annotationTree.children.tail.foldLeft(Binder(bindedType, Props(), false)) {
 
         case (binder @ Binder(_, props, _), q"factorio.this.`package`.replicated") =>
@@ -63,7 +63,6 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
           c.abort(annotationTree.pos, Log("`@binds` annotation requires stable parameter values.")(Nil))
       }
       named = Named(targetType, name)
-      _ = println("***** " + binder + ", " + annotationTree.children.tail)
     } yield {
 
       binders.get(named) match {
@@ -112,7 +111,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
       if (isBinder(declaration)) {
 
         val targetType :: bindedType :: Nil =
-          declaration.typeSignature.resultType.dealiasRecursively.typeArgs.map(_.dealiasRecursively)
+          declaration.typeSignature.resultType.dealiasAll.typeArgs.map(_.dealiasAll)
 
         val named = Named(targetType, name)
         val props = Props(name, replicated)
@@ -140,7 +139,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
       } else if (isProvider(declaration)) {
 
-        val targetType = declaration.typeSignature.resultType.dealiasRecursively
+        val targetType = declaration.typeSignature.resultType.dealiasAll
 
         val named = Named(targetType, name)
         val props = Props(name, replicated)
