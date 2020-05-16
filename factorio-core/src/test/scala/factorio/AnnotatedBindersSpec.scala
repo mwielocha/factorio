@@ -23,7 +23,9 @@ class AnnotatedBindersSpec extends AnyFlatSpec with Matchers {
     val thatClient: Client = new ThatClientImpl
 
     @blueprint
-    @binds[Client to OtherClientImpl](named = "other")
+    @binds[Client to OtherClientImpl](
+      named("other")
+    )
     class ServicesBlueprint {
 
       @provides
@@ -58,7 +60,7 @@ class AnnotatedBindersSpec extends AnyFlatSpec with Matchers {
   it should "honor `overrides` property when analyzing binders" in {
 
     @blueprint
-    @binds[Member to MemberImpl](replicated = false, overrides = true)
+    @binds[Member to MemberImpl](replicated, overrides)
     trait MemberBlueprint {}
 
     @blueprint
@@ -102,11 +104,15 @@ class AnnotatedBindersSpec extends AnyFlatSpec with Matchers {
 
   }
 
-  it should "assemble an app with `@binds` annotation na name" in {
+  it should "assemble an app with `@binds` annotation and name" in {
 
     @blueprint
-    @binds[Client to ThatClientImpl](named = "that")
-    @binds[Client to OtherClientImpl](named = "other")
+    @binds[Client to ThatClientImpl](
+      named(Clients.that)
+    )
+    @binds[Client to OtherClientImpl](
+      named("other")
+    )
     class ClientsBlueprint {}
 
     val assembler = Assembler[Clients](new ClientsBlueprint)
@@ -115,6 +121,20 @@ class AnnotatedBindersSpec extends AnyFlatSpec with Matchers {
 
     clients.thatClient.getClass() shouldBe classOf[ThatClientImpl]
     clients.otherClient.getClass() shouldBe classOf[OtherClientImpl]
+
+  }
+
+  it should "honor `replicated` argument of `@binds` annotation" in {
+
+    @blueprint
+    @binds[Service to ServiceImpl](replicated)
+    class SingleServiceAppBlueprint {}
+
+    val assembler = Assembler[SingleServiceApp](new SingleServiceAppBlueprint)
+
+    val app = assembler()
+
+    app.service should not be (app.serviceImpl)
 
   }
 }

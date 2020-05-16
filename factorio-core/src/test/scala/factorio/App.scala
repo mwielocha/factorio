@@ -31,6 +31,11 @@ trait Client
 class ThatClientImpl extends Client
 class OtherClientImpl(val repository: Repository) extends Client
 
+object Clients {
+  final val that = "that"
+  final val other = "other"
+}
+
 class Clients(@named("that") val thatClient: Client, @javax.inject.Named("other") val otherClient: Client)
 
 trait Member

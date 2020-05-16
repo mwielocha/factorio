@@ -18,6 +18,10 @@ trait Syntax {
 
   object Blank
 
+  val named = annotations.named
+  val overrides = annotations.overrides
+  val replicated = annotations.replicated
+
   @deprecated("Use Assembler[T] instead.", "0.0.2")
   def assemble[T]: Assembler[T] = Assembler[T]
 

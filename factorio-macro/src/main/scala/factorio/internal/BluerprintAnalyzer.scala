@@ -33,7 +33,10 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
       m.isPublic &&
       m.isAnnotatedWith(typeOf[provides])
 
-  private[internal] def analyzeBaseClassBinders(annotations: List[Annotation]): Map[Named[Type], Binder] = {
+  private[internal] def analyzeBaseClassBinders(
+    annotations: List[Annotation],
+    binders: Map[Named[Type], Binder]
+  ): Map[Named[Type], Binder] = {
 
     val output = mutable.Map.empty[Named[Type], Binder]
 
@@ -42,34 +45,48 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
       if (annotation.tree.tpe.erasure == typeOf[binds[_]].erasure)
       annotationTree = annotation.tree
       targetType :: bindedType :: Nil = annotationTree.tpe.typeArgs.head.typeArgs.map(_.dealiasRecursively)
-    } yield annotationTree.children.tail match {
+      binder @ Binder(_, Props(name, _, _), isOverride) = annotationTree.children.tail.foldLeft(Binder(bindedType, Props(), false)) {
 
-      case Nil =>
-        val props = Props(None, false)
-        output += (Named(targetType, None) -> Binder(bindedType, props, false))
+        case (binder @ Binder(_, props, _), q"factorio.this.`package`.replicated") =>
+          binder.copy(props = props || Props(repl = true))
 
-      case Literal(Constant(name: String)) :: Nil =>
-        val props = Props(Some(name), false)
-        output += (Named(targetType, Some(name)) -> Binder(bindedType, props, false))
+        case (binder, q"factorio.this.`package`.overrides") =>
+          binder.copy(isOverride = true)
 
-      case Literal(Constant(replicated: Boolean)) :: Nil =>
-        val props = Props(None, replicated)
-        output += (Named(targetType, None) -> Binder(bindedType, props, false))
+        case (binder @ Binder(_, Props(Some(_), _, _), _), q"factorio.this.`package`.named.apply(${Literal(Constant(name: String)) })") =>
+          c.abort(annotationTree.pos, Log("`@binds` annotation accepts only one `named` parameter.")(Nil))
 
-      case Literal(Constant(name: String)) :: Literal(Constant(replicated: Boolean)) :: Nil =>
-        val props = Props(Some(name), replicated)
-        output += (Named(targetType, Some(name)) -> Binder(bindedType, props, false))
+        case (binder @ Binder(_, props, _), q"factorio.this.`package`.named.apply(${Literal(Constant(name: String)) })") =>
+          binder.copy(props = props || Props(Some(name)))
 
-      case Literal(Constant(replicated: Boolean)) :: Literal(Constant(isOverride: Boolean)) :: Nil =>
-        val props = Props(None, replicated)
-        output += (Named(targetType, None) -> Binder(bindedType, props, isOverride))
+        case (binder, _) =>
+          c.abort(annotationTree.pos, Log("`@binds` annotation requires stable parameter values.")(Nil))
+      }
+      named = Named(targetType, name)
+      _ = println("***** " + binder + ", " + annotationTree.children.tail)
+    } yield {
 
-      case Literal(Constant(name: String)) :: Literal(Constant(replicated: Boolean)) :: Literal(Constant(isOverride: Boolean)) :: Nil =>
-        val props = Props(Some(name), replicated)
-        output += (Named(targetType, Some(name)) -> Binder(bindedType, props, isOverride))
+      binders.get(named) match {
 
-      case _ =>
-        c.abort(annotationTree.pos, Log("`@binds` annotation requires stable parameter values.")(Nil))
+        case Some(Binder(_, props, true)) if isOverride =>
+          c.abort(
+            c.enclosingPosition,
+            Log("Found multiple binders with {} for [{}], cannot figure out which one to use.", "`@overrides`", named)(Nil)
+          )
+
+        case Some(Binder(_, props, true)) =>
+        // previous one is an override, skipping
+
+        case Some(Binder(_, props, false)) if !isOverride =>
+          c.warning(
+            c.enclosingPosition,
+            Log("Found multiple binders for [{}], consider using {} to force select one of them.", named, "`@overrides`")(Nil)
+          )
+
+        case _ =>
+          output += (named -> binder)
+      }
+
     }
 
     output.to(Map)
@@ -82,7 +99,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
 
     for {
       baseClassSymbol <- blueprintBaseClassSymbols
-      _ = binders ++= analyzeBaseClassBinders(baseClassSymbol.annotations)
+      _ = binders ++= analyzeBaseClassBinders(baseClassSymbol.annotations, binders.to(Map))
       declaration <- baseClassSymbol.typeSignature.decls
       if !declaration.isConstructor
     } yield {

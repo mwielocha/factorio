@@ -3,24 +3,30 @@ package factorio.annotations
 import factorio.Binder
 import scala.annotation.StaticAnnotation
 
-class binds[B <: Binder[_, _]] private (named: Option[String], replicated: Boolean, overrides: Boolean) extends StaticAnnotation {
+// class binds[B <: Binder[_, _]] private (
+//   named: Option[String],
+//   replicated: Option[replicated],
+//   overrides: Option[overrides]
+// ) extends StaticAnnotation {
 
-  def this() =
-    this(None, false, false)
+//   def this(replicated: replicated) =
+//     this(None, Some(replicated), None)
 
-  def this(named: String) =
-    this(Some(named), false, false)
+//   def this(overrides: overrides) =
+//     this(None, None, Some(overrides))
 
-  def this(replicated: Boolean) =
-    this(None, replicated, false)
+//   def this(named: String) =
+//     this(Some(named), None, None)
 
-  def this(named: String, replicated: Boolean) =
-    this(Some(named), replicated, false)
+//   def this(named: String, overrides: overrides) =
+//     this(Some(named), None, Some(overrides))
 
-  def this(replicated: Boolean, overrides: Boolean) =
-    this(None, replicated, overrides)
+//   def this(named: String, replicated: replicated) =
+//     this(Some(named), Some(replicated), None)
 
-  def this(named: String, replicated: Boolean, overrides: Boolean) =
-    this(Some(named), replicated, overrides)
+//   def this(named: String, replicated: replicated, overrides: overrides) =
+//     this(Some(named), Some(replicated), Some(overrides))
 
-}
+// }
+
+class binds[B <: Binder[_, _]](annotation: StaticAnnotation*) extends StaticAnnotation
