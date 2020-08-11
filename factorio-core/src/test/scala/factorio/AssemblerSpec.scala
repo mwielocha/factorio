@@ -2,6 +2,7 @@ package factorio
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import java.util.concurrent.CyclicBarrier
 
 class AssemblerSpec extends AnyFlatSpec with Matchers {
 
@@ -328,6 +329,48 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     app.serviceBox.value.getClass() shouldBe classOf[ServiceImpl]
 
+  }
+
+  it should "provide a component from annotated val" in {
+
+    sealed trait Bar
+    case object Bar extends Bar
+
+    case class Foo(bar: Bar)
+
+    @blueprint
+    class AppBlueprint(@provides val bar: Bar)
+
+    case class App(bar: Bar)
+
+    val assembler = Assembler[App](new AppBlueprint(Bar))
+
+    assembler().bar shouldBe Bar
+  }
+
+  it should "provide vals from deconstruced case class" in {
+
+    sealed trait Bar
+    case object Bar extends Bar
+
+    sealed trait Baz
+    case object Baz extends Baz
+
+    case class Foo(bar: Bar, baz: Baz)
+
+    @blueprint
+    class AppBlueprint {
+      @provides
+      val foo @ Foo(bar, baz) = Foo(Bar, Baz)
+    }
+
+    case class App(bar: Bar, baz: Baz)
+
+    val assembler = Assembler[App](new AppBlueprint)
+    val app = assembler()
+
+    app.bar shouldBe Bar
+    app.baz shouldBe Baz
   }
 
   it should "assembler an app with type syntax binder" in {
