@@ -358,18 +358,19 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     case class Foo(bar: Bar, baz: Baz)
 
     @blueprint
-    class AppBlueprint {
+    class AppBlueprint(@provides val foo: Foo) {
       @provides
-      val foo @ Foo(bar, baz) = Foo(Bar, Baz)
+      val Foo(bar, baz) = foo
     }
 
-    case class App(bar: Bar, baz: Baz)
+    case class App(foo: Foo, bar: Bar, baz: Baz)
 
-    val assembler = Assembler[App](new AppBlueprint)
+    val assembler = Assembler[App](new AppBlueprint(Foo(Bar, Baz)))
     val app = assembler()
 
     app.bar shouldBe Bar
     app.baz shouldBe Baz
+    app.foo shouldBe Foo(Bar, Baz)
   }
 
   it should "assembler an app with type syntax binder" in {
