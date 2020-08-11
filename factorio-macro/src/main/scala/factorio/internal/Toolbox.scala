@@ -63,7 +63,7 @@ private[internal] trait Toolbox[+C <: blackbox.Context] {
   }
 
   private val isNamedAnnotation: Type => Boolean =
-    Set(typeOf[named], typeOf[javax.inject.Named])
+    tpe => tpe == typeOf[named] || s"$tpe" == "javax.inject.Named"
 
   private[internal] def namedValue(s: Symbol): Option[String] =
     namedValue(s, s.annotations)

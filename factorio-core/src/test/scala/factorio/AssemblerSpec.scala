@@ -269,7 +269,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   }
 
-  it should "find a `@named`` provider with a stable identifier" in {
+  it should "find a `@named` provider with a stable identifier" in {
 
     @blueprint
     class StableIdentifierAppBlueprint {
@@ -328,6 +328,49 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
     app.serviceBox.value.getClass() shouldBe classOf[ServiceImpl]
 
+  }
+
+  it should "provide a component from annotated val" in {
+
+    sealed trait Bar
+    case object Bar extends Bar
+
+    case class Foo(bar: Bar)
+
+    @blueprint
+    class AppBlueprint(@provides val bar: Bar)
+
+    case class App(bar: Bar)
+
+    val assembler = Assembler[App](new AppBlueprint(Bar))
+
+    assembler().bar shouldBe Bar
+  }
+
+  it should "provide vals from deconstructed case class" in {
+
+    sealed trait Bar
+    case object Bar extends Bar
+
+    sealed trait Baz
+    case object Baz extends Baz
+
+    case class Foo(bar: Bar, baz: Baz)
+
+    @blueprint
+    class AppBlueprint(@provides val foo: Foo) {
+      @provides
+      val Foo(bar, baz) = foo
+    }
+
+    case class App(foo: Foo, bar: Bar, baz: Baz)
+
+    val assembler = Assembler[App](new AppBlueprint(Foo(Bar, Baz)))
+    val app = assembler()
+
+    app.bar shouldBe Bar
+    app.baz shouldBe Baz
+    app.foo shouldBe Foo(Bar, Baz)
   }
 
   it should "assembler an app with type syntax binder" in {

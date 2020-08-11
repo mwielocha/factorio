@@ -3,8 +3,8 @@
 val scalatestVersion = "3.1.1"
 
 val buildSettings = Seq(
-  scalaVersion := "2.13.2",
-  version := "0.2.0",
+  scalaVersion := "2.13.3",
+  version := "0.3.0",
   organization := "io.mwielocha",
   organizationName := "mwielocha",
   organizationHomepage := Some(url("http://mwielocha.io/")),
@@ -54,7 +54,6 @@ lazy val `factorio-macro` = (project in file("factorio-macro")).
   settings(buildSettings ++ Seq(
     name := "factorio-macro",
     libraryDependencies ++= Seq(
-      "javax.inject" % "javax.inject" % "1",
       "org.scala-lang" % "scala-reflect" % scalaVersion.value
     )
   )).dependsOn(`factorio-annotations` % "compile->compile;test->test")
@@ -63,6 +62,7 @@ lazy val `factorio-core` = (project in file("factorio-core")).
   settings(buildSettings ++ Seq(
     name := "factorio-core",
     libraryDependencies ++= Seq(
+      "javax.inject" % "javax.inject" % "1" % Test,
       "org.scalatest" %% "scalatest" % scalatestVersion % Test,
     )
   )).dependsOn(`factorio-annotations`, `factorio-macro` % "compile->compile;test->test")

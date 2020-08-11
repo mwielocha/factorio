@@ -28,10 +28,23 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
       // accessor methods don't hold annotation so are not interesting to us
       !(m.isPublic && m.isTerm && m.asTerm.isGetter && !m.asTerm.isVal)
 
-  private[internal] def isProvider(m: Symbol): Boolean =
+  private[internal] def isProvider(m: Symbol, scope: MemberScope): Boolean = {
+
     m.isMethod &&
-      m.isPublic &&
-      m.isAnnotatedWith(typeOf[provides])
+    m.isPublic &&
+    m.isAnnotatedWith(typeOf[provides]) | {
+
+      m.asTerm.isGetter && (
+        scope.exists { x =>
+          x != m &&
+          s"${x.name}".trim == s"${m.name}".trim &&
+          x.isTerm &&
+          x.asTerm.isVal &&
+          x.isAnnotatedWith(typeOf[provides])
+        }
+      )
+    }
+  }
 
   private[internal] def analyzeBaseClassBinders(
     annotations: List[Annotation],
@@ -99,8 +112,8 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
     for {
       baseClassSymbol <- blueprintBaseClassSymbols
       _ = binders ++= analyzeBaseClassBinders(baseClassSymbol.annotations, binders.to(Map))
-      declaration <- baseClassSymbol.typeSignature.decls
-      if !declaration.isConstructor
+      declarations = baseClassSymbol.typeSignature.decls
+      declaration <- declarations.filterNot(_.isConstructor)
     } yield {
 
       val name = declaration.named
@@ -137,7 +150,7 @@ class BluerprintAnalyzer[+C <: blackbox.Context, R : C#WeakTypeTag](override val
             binders += (named -> Binder(bindedType, props, isOverride))
         }
 
-      } else if (isProvider(declaration)) {
+      } else if (isProvider(declaration, declarations)) {
 
         val targetType = declaration.asMethod.returnType.dealiasAll
 
