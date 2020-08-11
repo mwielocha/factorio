@@ -2,7 +2,6 @@ package factorio
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import java.util.concurrent.CyclicBarrier
 
 class AssemblerSpec extends AnyFlatSpec with Matchers {
 
