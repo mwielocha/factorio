@@ -269,7 +269,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
 
   }
 
-  it should "find a `@named`` provider with a stable identifier" in {
+  it should "find a `@named` provider with a stable identifier" in {
 
     @blueprint
     class StableIdentifierAppBlueprint {
