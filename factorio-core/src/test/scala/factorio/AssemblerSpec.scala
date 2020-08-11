@@ -347,7 +347,7 @@ class AssemblerSpec extends AnyFlatSpec with Matchers {
     assembler().bar shouldBe Bar
   }
 
-  it should "provide vals from deconstruced case class" in {
+  it should "provide vals from deconstructed case class" in {
 
     sealed trait Bar
     case object Bar extends Bar
