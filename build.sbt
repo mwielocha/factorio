@@ -1,10 +1,12 @@
 // Generated with scalagen
+import sbtcrossproject.CrossPlugin.autoImport.crossProject
+import sbtcrossproject.CrossPlugin.autoImport.CrossType
 
 val scalatestVersion = "3.1.1"
 
 val buildSettings = Seq(
   scalaVersion := "2.13.3",
-  version := "0.3.0",
+  version := "0.3.1-SNAPSHOT",
   organization := "io.mwielocha",
   organizationName := "mwielocha",
   organizationHomepage := Some(url("http://mwielocha.io/")),
@@ -22,18 +24,14 @@ val buildSettings = Seq(
   scalafmtOnCompile in ThisBuild := true,
   publishMavenStyle := true,
   publishArtifact in Test := false,
-  pomIncludeRepository := { _ => false },
+  pomIncludeRepository := { _ =>
+    false
+  },
   homepage := Some(url("https://github.com/mwielocha/factorio")),
   description := "Tiny, compile time dependency injection framework for Scala.",
-  scmInfo := Some(
-  ScmInfo(url("https://github.com/mwielocha/factorio"),
-    "scm:git@github.com:mwielocha/factorio.git")),
+  scmInfo := Some(ScmInfo(url("https://github.com/mwielocha/factorio"), "scm:git@github.com:mwielocha/factorio.git")),
   developers := List(
-    Developer("mwielocha",
-      "Mikolaj Wielocha",
-      "mwielocha@icloud.com",
-      url("https://github.com/mwielocha")
-    )
+    Developer("mwielocha", "Mikolaj Wielocha", "mwielocha@icloud.com", url("https://github.com/mwielocha"))
   ),
   licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
   publishMavenStyle := true,
@@ -45,30 +43,53 @@ val buildSettings = Seq(
   credentials += Credentials(Path.userHome / ".sbt" / ".sonatype_credentials")
 )
 
-lazy val `factorio-annotations` = (project in file("factorio-annotations")).
-  settings(buildSettings ++ Seq(
-    name := "factorio-annotations"
-  ))
-
-lazy val `factorio-macro` = (project in file("factorio-macro")).
-  settings(buildSettings ++ Seq(
-    name := "factorio-macro",
-    libraryDependencies ++= Seq(
-      "org.scala-lang" % "scala-reflect" % scalaVersion.value
+lazy val `factorio-annotations` =
+  crossProject(JSPlatform, JVMPlatform)
+    .withoutSuffixFor(JVMPlatform)
+    .crossType(CrossType.Pure)
+    .in(file("factorio-annotations"))
+    .settings(
+      buildSettings ++ Seq(
+        name := "factorio-annotations"
+      )
     )
-  )).dependsOn(`factorio-annotations` % "compile->compile;test->test")
 
-lazy val `factorio-core` = (project in file("factorio-core")).
-  settings(buildSettings ++ Seq(
-    name := "factorio-core",
-    libraryDependencies ++= Seq(
-      "javax.inject" % "javax.inject" % "1" % Test,
-      "org.scalatest" %% "scalatest" % scalatestVersion % Test,
-    )
-  )).dependsOn(`factorio-annotations`, `factorio-macro` % "compile->compile;test->test")
+lazy val `factorio-macro` =
+  crossProject(JSPlatform, JVMPlatform)
+    .withoutSuffixFor(JVMPlatform)
+    .crossType(CrossType.Pure)
+    .in(file("factorio-macro"))
+    .settings(
+      buildSettings ++ Seq(
+        name := "factorio-macro",
+        libraryDependencies ++= Seq(
+          "org.scala-lang" % "scala-reflect" % scalaVersion.value
+        )
+      )
+    ).dependsOn(`factorio-annotations` % "compile->compile;test->test")
+
+lazy val `factorio-core` =
+  crossProject(JSPlatform, JVMPlatform)
+    .withoutSuffixFor(JVMPlatform)
+    .crossType(CrossType.Pure)
+    .in(file("factorio-core"))
+    .settings(
+      buildSettings ++ Seq(
+        name := "factorio-core",
+        libraryDependencies ++= Seq(
+          "javax.inject" % "javax.inject" % "1" % Test,
+          "org.scalatest" %% "scalatest" % scalatestVersion % Test
+        )
+      )
+    ).dependsOn(`factorio-annotations`, `factorio-macro` % "compile->compile;test->test")
 
 lazy val factorio = (project in file("."))
   .settings(buildSettings ++ Seq(packagedArtifacts := Map.empty))
-  .aggregate(`factorio-annotations`, `factorio-core`, `factorio-macro`)
-
-
+  .aggregate(
+    `factorio-annotations`.jvm,
+    `factorio-annotations`.js,
+    `factorio-core`.jvm,
+    `factorio-core`.js,
+    `factorio-macro`.jvm,
+    `factorio-macro`.js
+  )
