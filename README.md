@@ -252,10 +252,12 @@ You can also provide multiple implementations for the same types with the `@name
  @blueprint
  class AppBlueprint {
    
+   @provides
    @named("that")
    def thatService(repository: Repository) =
      new ServiceImpl(repository) 
    
+   @provides
    @named("other")
    def otherService(repository: Repository) =
      new ServiceImpl(repository)
