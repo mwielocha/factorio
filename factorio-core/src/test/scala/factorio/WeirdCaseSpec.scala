@@ -5,11 +5,11 @@ import org.scalatest.matchers.should.Matchers
 
 object WeirdCaseDomain {
 
-  trait Thing1
-  class RealThing1 extends Thing1
+  trait Thing
+  class RealThing extends Thing
 
   class WantSomething(
-    val some: Thing1
+    val some: Thing
   )
 
 }
@@ -22,7 +22,7 @@ class WeirdCaseSpec extends AnyFlatSpec with Matchers {
   class TestBlueprint {
 
     @provides
-    def thing: Thing1 = new RealThing1
+    def thing: Thing = new RealThing
   }
 
   "Assembly macro" should "assemble a component" in {
