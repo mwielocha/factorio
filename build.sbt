@@ -6,7 +6,7 @@ val scalatestVersion = "3.1.1"
 
 val buildSettings = Seq(
   scalaVersion := "2.13.3",
-  version := "0.3.1-SNAPSHOT",
+  version := "0.3.1",
   organization := "io.mwielocha",
   organizationName := "mwielocha",
   organizationHomepage := Some(url("http://mwielocha.io/")),
