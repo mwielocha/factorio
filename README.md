@@ -5,12 +5,15 @@ Tiny compile time dependency injection framework for Scala
 - everything is a singleton by default
 - compile time checking for dependency graph correctness 
 
+As of version `0.3.1` factorio supports scalajs.
+
+
 # Usage
 
 ### Installation
 
 ```scala
-val factorioVersion = "0.2.0"
+val factorioVersion = "0.3.1"
 
 libraryDependencies ++= Seq(
   "io.mwielocha" %% "factorio-core" % factorioVersion,

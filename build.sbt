@@ -40,6 +40,7 @@ val buildSettings = Seq(
     if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
     else Some("releases" at nexus + "service/local/staging/deploy/maven2")
   },
+  publishConfiguration := publishConfiguration.value.withOverwrite(true),
   credentials += Credentials(Path.userHome / ".sbt" / ".sonatype_credentials")
 )
 
